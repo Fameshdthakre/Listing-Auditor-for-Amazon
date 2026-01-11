@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Listing Auditor & Scraper",
+  "version": "5.5",
+  "description": "Professional auditing tool for Amazon Agencies, Sellers and Vendors. Features Multi-marketplace support, LQS scoring, and stock/delivery audits.",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "activeTab",
+    "contentSettings"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Amazon Listing Auditor & Scraper"
+  }
+}
