@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const statTotal = document.getElementById('statTotal');
   const statLqs = document.getElementById('statLqs');
   const statIssues = document.getElementById('statIssues');
+  const lqsBreakdownList = document.getElementById('lqsBreakdownList');
+  const lqsListContent = document.getElementById('lqsListContent');
 
   let allExtractedData = [];
   let isScanning = false;
@@ -110,6 +112,23 @@ document.addEventListener('DOMContentLoaded', () => {
     
     return null;
   };
+
+  // --- Load State from Storage ---
+  chrome.storage.local.get(['lastScanData', 'lastMode'], (result) => {
+    if (result.lastMode) {
+        mode = result.lastMode;
+        if (mode === 'bulk') {
+            tabBulk.click();
+        } else {
+            tabCurrent.click();
+        }
+    }
+
+    if (result.lastScanData && result.lastScanData.length > 0) {
+        allExtractedData = result.lastScanData;
+        finishScan(false); // Re-render results
+    }
+  });
 
   // --- UI Switching ---
   tabCurrent.addEventListener('click', () => {
@@ -398,6 +417,26 @@ document.addEventListener('DOMContentLoaded', () => {
       // Show dashboard, hide raw text
       resultsArea.style.display = 'none';
       dashboardView.style.display = 'grid';
+
+      // Show Breakdown for the LAST item if available
+      if (total > 0) {
+          const lastItem = allExtractedData[total - 1];
+          if (lastItem.attributes && lastItem.attributes.lqsBreakdown) {
+              lqsListContent.innerHTML = '';
+              lastItem.attributes.lqsBreakdown.forEach(item => {
+                  const div = document.createElement('div');
+                  div.className = 'lqs-item';
+                  const status = item.passed ? '<span class="lqs-pass">✔ PASS</span>' : '<span class="lqs-fail">✘ FAIL</span>';
+                  div.innerHTML = `<span>${item.label}</span> ${status}`;
+                  lqsListContent.appendChild(div);
+              });
+              lqsBreakdownList.style.display = 'block';
+          } else {
+              lqsBreakdownList.style.display = 'none';
+          }
+      } else {
+          lqsBreakdownList.style.display = 'none';
+      }
   }
 
   function finishScan(hasError = false) {
@@ -408,6 +447,12 @@ document.addEventListener('DOMContentLoaded', () => {
     progressContainer.style.display = 'none';
 
     if (allExtractedData.length > 0) {
+        // Save to Storage
+        chrome.storage.local.set({
+            lastScanData: allExtractedData,
+            lastMode: mode
+        });
+
         // Show Dashboard View instead of just JSON text
         updateDashboard();
         

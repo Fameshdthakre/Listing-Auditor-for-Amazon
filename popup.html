@@ -138,6 +138,28 @@
     }
     .dash-value.good { color: #28a745; }
     .dash-value.bad { color: #dc3545; }
+
+    #lqsBreakdownList {
+        margin-top: 15px;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        padding: 10px;
+        background: white;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .lqs-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px dashed #eee;
+        font-size: 11px;
+    }
+    .lqs-item:last-child { border-bottom: none; }
+    .lqs-pass { color: #28a745; font-weight: bold; }
+    .lqs-fail { color: #dc3545; font-weight: bold; }
+    .lqs-header { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #333; }
   </style>
 </head>
 <body>
@@ -261,6 +283,11 @@
       <div class="dash-label">Issues Found</div>
       <div class="dash-value bad" id="statIssues">-</div>
     </div>
+  </div>
+
+  <div id="lqsBreakdownList" style="display:none;">
+    <div class="lqs-header">LQS Breakdown (Last Scanned Item)</div>
+    <div id="lqsListContent"></div>
   </div>
 
   <textarea id="results" placeholder="Results will appear here..."></textarea>

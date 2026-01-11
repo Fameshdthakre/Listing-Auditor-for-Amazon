@@ -356,16 +356,23 @@
     const hasDescription = (description !== "none" && descLen > 5) ? "YES" : "NO";
 
     // LQS
-    let score = 0;
-    if (metaTitle && metaTitle.length >= 80 && metaTitle.length <= 200) score += 10;
     const imageCount = items.length;
-    if (imageCount >= 7) score += 15;
-    if (bulletCount >= 5) score += 15;
-    if (descLen >= 100) score += 5;
-    if (videos.length > 0) score += 15;
-    if (aPlusImgs.length > 0) score += 20;
-    if (ratingVal >= 4.0) score += 10;
-    if (reviewCount > 15) score += 10;
+    const lqsCriteria = [
+        { label: "Title Length (80-200 chars)", weight: 10, passed: (metaTitle && metaTitle.length >= 80 && metaTitle.length <= 200) },
+        { label: "7+ Images", weight: 15, passed: (imageCount >= 7) },
+        { label: "5+ Bullet Points", weight: 15, passed: (bulletCount >= 5) },
+        { label: "Description Length (>100 chars)", weight: 5, passed: (descLen >= 100) },
+        { label: "Has Video", weight: 15, passed: (videos.length > 0) },
+        { label: "Has A+ Content", weight: 20, passed: (aPlusImgs.length > 0) },
+        { label: "Rating >= 4.0", weight: 10, passed: (ratingVal >= 4.0) },
+        { label: "Review Count > 15", weight: 10, passed: (reviewCount > 15) }
+    ];
+
+    let score = 0;
+    lqsCriteria.forEach(c => {
+        if (c.passed) score += c.weight;
+    });
+
     const lqs = score + "/100";
 
     return {
@@ -401,7 +408,8 @@
         hasVideo,
         hasBullets,
         hasDescription,
-        lqs
+        lqs,
+        lqsBreakdown: lqsCriteria
       },
       data: items
     };
