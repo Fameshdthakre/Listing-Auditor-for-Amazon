@@ -63,6 +63,18 @@
         });
         brand = brand.trim();
     }
+
+    // Fallback: Check rhapsodyARIngressViewModel for brand if DOM extraction failed
+    if (brand === "none" || brand === "") {
+        try {
+            const rhapsodyMatch = pageSource.match(/rhapsodyARIngressViewModel\s*=\s*\{[\s\S]*?brand\s*:\s*["']([^"']+)["']/);
+            if (rhapsodyMatch && rhapsodyMatch[1]) {
+                brand = rhapsodyMatch[1].trim();
+            }
+        } catch (e) {
+            // Ignore regex errors
+        }
+    }
     
     // Metadata
     const mediaAsinMatch = pageSource.match(/"mediaAsin"\s*:\s*"([^"]+)"/);
@@ -120,7 +132,7 @@
     const ratingRaw = ratingEl ? ratingEl.textContent.trim() : "none";
     const ratingVal = ratingRaw !== "none" ? parseFloat(ratingRaw.split(" ")[0].replace(/,/g, ".").replace(",", ".")) : 0;
 
-    // Reviews
+    // Reviews (Updated Logic)
     const reviewEl = document.querySelector('span[id="acrCustomerReviewText"]');
     let reviewsRaw = "none";
     let reviewCount = 0;
@@ -128,7 +140,8 @@
         reviewsRaw = reviewEl.textContent.trim()
             .replace(/[()]/g, "")
             .replace(/&nbsp;/g, "")
-            .replace(/Â /g, "")
+            .replace(/Â/g, "")
+            .replace(/\s+/g, "")
             .replace(/\./g, "");
             
         const digitStr = reviewsRaw.replace(/\D/g, ''); 
@@ -196,31 +209,89 @@
 
     const deliveryBlock = document.getElementById('mir-layout-DELIVERY_BLOCK');
     if (deliveryBlock) {
-        const primaryMessage = deliveryBlock.querySelector('#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE span[data-csa-c-delivery-price="FREE"]');
-        if (primaryMessage) {
-             const time = primaryMessage.getAttribute('data-csa-c-delivery-time');
-             if(time) freeDeliveryDate = time;
+        // Pre-selectors for known locations
+        
+        // 1. PRIMARY MESSAGE (Updated for Paid logic)
+        const primaryMessageSpan = deliveryBlock.querySelector('div[id*="mir-layout-DELIVERY_BLOCK"] > div[id*="mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE"] > span[data-csa-c-delivery-price]');
+        if (primaryMessageSpan) {
+             const priceType = primaryMessageSpan.getAttribute('data-csa-c-delivery-price');
+             const time = primaryMessageSpan.getAttribute('data-csa-c-delivery-time');
+             
+             if (time) {
+                 if (priceType === "FREE") {
+                     freeDeliveryDate = time;
+                 } else if (/\d/.test(priceType)) {
+                     // It's a price like "$6.99", treat as Paid Standard Delivery
+                     freeDeliveryDate = `Pay: ${priceType}, ${time}`;
+                 }
+             }
         }
         
-        const secondaryMessage = deliveryBlock.querySelector('#mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE span[data-csa-c-type="element"]');
+        // 2. SECONDARY MESSAGE
+        const secondaryMessage = deliveryBlock.querySelector('div[id*="mir-layout-DELIVERY_BLOCK"] > div[id*="mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE"] > span[data-csa-c-delivery-price="FREE"]');
         if (secondaryMessage) {
              const time = secondaryMessage.getAttribute('data-csa-c-delivery-time');
              if(time) primeDeliveryDate = time;
         }
 
-        const allDeliverySpans = Array.from(deliveryBlock.querySelectorAll('span[data-csa-c-delivery-time]'));
+        // 3. TERTIARY MESSAGE (Fastest)
+        const tertiaryMessage = deliveryBlock.querySelector('div[id*="mir-layout-DELIVERY_BLOCK"] > div[id*="mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE"] > span[data-csa-c-delivery-price="fastest"]');
+        if (tertiaryMessage) {
+             const time = tertiaryMessage.getAttribute('data-csa-c-delivery-time');
+             if(time) fastestDeliveryDate = time;
+        }
+
+        // Expanded Scan for all spans to capture new text formats or missed items
+        const allDeliverySpans = Array.from(deliveryBlock.querySelectorAll('span'));
+        
+        const extractDate = (txt) => {
+            // Regex to find patterns like "Wednesday, January 14" or "Wed, Jan 14"
+            const dateRegex = /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}/i;
+            const match = txt.match(dateRegex);
+            return match ? match[0] : null;
+        };
+
         allDeliverySpans.forEach(span => {
-            const text = span.textContent;
-            const time = span.getAttribute('data-csa-c-delivery-time');
+            const text = span.textContent.trim();
+            if (!text) return;
             
-            if (text.includes("FREE delivery") && freeDeliveryDate === "none") freeDeliveryDate = time;
-            if (text.includes("Prime members") && primeDeliveryDate === "none") primeDeliveryDate = time;
-            if ((text.includes("Fastest delivery") || text.includes("Tomorrow") || text.includes("Overnight")) && fastestDeliveryDate === "none") fastestDeliveryDate = time;
+            const textLower = text.toLowerCase();
+            let time = span.getAttribute('data-csa-c-delivery-time');
+            
+            // Fallback: If no attribute, try to extract date from text
+            if (!time) {
+                time = extractDate(text);
+            }
+            
+            if (!time) return; // If we still have no date, skip
+
+            // Free Delivery Logic
+            if (textLower.includes("free delivery") && freeDeliveryDate === "none") {
+                freeDeliveryDate = time;
+            }
+            
+            // Prime Delivery Logic
+            if (textLower.includes("prime members") && primeDeliveryDate === "none") {
+                primeDeliveryDate = time;
+            }
+            
+            // Fastest Delivery Logic (Case Insensitive)
+            if (textLower.includes("fastest delivery") && fastestDeliveryDate === "none") {
+                fastestDeliveryDate = time;
+            }
+
+            // Paid Standard Delivery Logic (e.g. "$6.99 delivery") fallback
+            // Maps to freeDeliveryDate as the "Standard" slot if empty
+            const paidMatch = text.match(/(\$\d+(?:\.\d{2})?)\s+delivery/i);
+            if (paidMatch && freeDeliveryDate === "none") {
+                 const price = paidMatch[1];
+                 freeDeliveryDate = `Pay: ${price}, ${time}`;
+            }
         });
     }
 
     // Bullets
-    const bulletsList = Array.from(document.querySelectorAll('#feature-bullets li span.a-list-item'))
+    const bulletsList = Array.from(document.querySelectorAll('#feature-bullets li span.a-list-item, div[id*="productFactsDesktopExpander"] > div > ul > li > span[class*="a-list-item"]'))
       .map(el => el.textContent.trim())
       .filter(text => text.length > 0);
     const bullets = bulletsList.join(" | ");
