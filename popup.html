@@ -1,274 +1,527 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <style>
-    body {
-      width: 500px;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 15px;
-      background-color: #f8f9fa;
-      color: #333;
+    :root {
+      --primary: #2563eb;       /* Modern Blue */
+      --primary-hover: #1d4ed8;
+      --secondary: #64748b;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --purple: #7c3aed;
     }
-    h2 {
-      margin-top: 0;
-      font-size: 18px;
+
+    body {
+      width: 480px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 0;
+      margin: 0;
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-size: 13px; 
+    }
+
+    .app-container {
+        padding: 16px;
+    }
+
+    /* --- Header --- */
+    .top-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
     }
+    
+    h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .badge {
       font-size: 10px;
-      background: #6f42c1; /* Purple for Auditor Pro */
+      background: var(--purple);
       color: white;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .options-container {
-      background: white;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      padding: 10px;
-      margin-bottom: 15px;
-    }
-    .options-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
       font-weight: 600;
-      margin-bottom: 8px;
-      padding-bottom: 5px;
-      border-bottom: 1px solid #eee;
+      letter-spacing: 0.5px;
     }
+
+    .auth-btn {
+      font-size: 12px;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--primary);
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      
+      /* Fixed layout overrides */
+      flex: none; /* Prevent growing to half width */
+      width: 140px; /* Approx 1/3rd of window */
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .auth-btn:hover {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    /* --- Tabs --- */
     .mode-tabs {
       display: flex;
-      gap: 5px;
-      margin-bottom: 10px;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 8px;
+      margin-bottom: 16px;
     }
+
     .mode-tab {
       flex: 1;
-      padding: 8px;
       text-align: center;
-      background: #e9ecef;
-      border-radius: 4px;
-      cursor: pointer;
+      padding: 6px;
       font-size: 12px;
       font-weight: 600;
-      color: #666;
-      transition: background 0.2s, color 0.2s;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
     }
+
     .mode-tab.active {
-      background: #007bff;
-      color: white;
+      background: var(--surface);
+      color: var(--primary);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
+    
+    .mode-tab.disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      color: var(--text-muted);
+    }
+    
+    .lock-icon { font-size: 12px; }
+
+    /* --- Bulk Section --- */
     #bulkSection {
       display: none;
-      margin-bottom: 15px;
-      padding: 10px;
-      background: #eef2f7;
-      border-radius: 4px;
-      border: 1px dashed #ced4da;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
-    .file-input-wrapper { margin-bottom: 5px; }
-    .file-input-wrapper input { font-size: 11px; }
-    .bulk-hint { font-size: 10px; color: #666; margin-bottom: 5px; }
-    .bulk-controls { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 11px; color: #333; }
-    .control-row { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
     
-    .section-label {
-        font-size: 10px; color: #888; font-weight: 700; margin-top: 5px; margin-bottom: 2px;
-        grid-column: span 2; text-transform: uppercase; letter-spacing: 0.5px;
+    .bulk-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; }
+    
+    .file-input-wrapper input {
+        width: 100%;
+        font-size: 12px;
+        color: var(--text-muted);
     }
-    .attributes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; max-height: 200px; overflow-y: auto; }
-    .checkbox-item { font-size: 11px; display: flex; align-items: center; }
-    .checkbox-item input { margin-right: 6px; }
-    .checkbox-item label { cursor: pointer; }
-    .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
-    button {
-      flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;
-      transition: background 0.2s; font-weight: 600;
+    
+    .bulk-controls { display: grid; gap: 10px; margin-top: 10px; }
+    
+    .control-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
     }
-    #scanBtn { background-color: #007bff; color: white; }
-    #scanBtn:hover { background-color: #0056b3; }
-    #scanBtn:disabled { background-color: #a0cfff; cursor: not-allowed; }
-    #stopBtn { background-color: #dc3545; color: white; display: none; }
-    #stopBtn:hover { background-color: #bd2130; }
-    #status { margin: 10px 0; font-size: 12px; color: #666; font-weight: 500; }
-    #progressContainer { width: 100%; background-color: #e0e0e0; border-radius: 4px; height: 8px; margin-bottom: 10px; display: none; }
-    #progressBar { width: 0%; height: 100%; background-color: #28a745; border-radius: 4px; transition: width 0.3s ease; }
-    #results {
-      width: 100%; height: 100px; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;
-      font-family: 'Consolas', monospace; font-size: 11px; white-space: pre; overflow-y: scroll;
-      background: white; resize: vertical; box-sizing: border-box;
+    
+    .control-row label { color: var(--text-muted); font-weight: 600; }
+    
+    select, input[type="number"] {
+        padding: 4px 8px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--bg);
+        color: var(--text-main);
+        font-size: 12px;
+        outline: none;
     }
-    .action-btn { margin-top: 8px; width: 100%; display: none; }
-    #copyBtn { background-color: #28a745; color: white; }
-    #copyBtn:hover { background-color: #218838; }
-    #downloadBtn { background-color: #17a2b8; color: white; }
-    #downloadBtn:hover { background-color: #138496; }
-    .signature { margin-top: 15px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #e9ecef; padding-top: 8px; }
-    .warning { color: #dc3545; font-weight: bold; font-size: 11px; display:none; margin-bottom:5px;}
-    select { padding: 2px; font-size: 11px; border: 1px solid #ced4da; border-radius: 3px; max-width: 150px; }
+    select:focus, input:focus { border-color: var(--primary); }
 
-    /* Dashboard Styles */
-    #dashboardView {
-      display: none;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 10px;
+    /* --- Options Grid --- */
+    .options-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0;
+      overflow: hidden;
+      margin-bottom: 16px;
     }
-    .dash-card {
-      background: white;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
+    
+    .options-header {
+      background: #f8fafc;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .attributes-grid {
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    
+    /* Custom Scrollbar */
+    .attributes-grid::-webkit-scrollbar { width: 6px; }
+    .attributes-grid::-webkit-scrollbar-track { background: transparent; }
+    .attributes-grid::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    .section-label {
+        grid-column: span 2;
+        font-size: 11px;
+        color: var(--primary);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 10px;
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+        border-bottom: 1px dashed var(--border);
+        display: flex;
+        justify-content: space-between;
+    }
+    .section-label:first-child { margin-top: 0; }
+    
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        color: var(--text-main);
+    }
+    
+    .checkbox-item input {
+        margin: 0 8px 0 0;
+        accent-color: var(--primary);
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+    }
+    
+    .checkbox-item label { cursor: pointer; user-select: none; }
+    .checkbox-item input:disabled + label { color: #cbd5e1; cursor: not-allowed; }
+
+    /* --- Actions --- */
+    .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
+    
+    button {
       padding: 10px;
-      text-align: center;
+      border-radius: 6px;
+      border: none;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1; /* Global flex:1 makes buttons fill available width */
     }
-    .dash-label {
-      font-size: 10px;
-      color: #666;
-      text-transform: uppercase;
-      font-weight: 700;
+    
+    #scanBtn {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
     }
-    .dash-value {
-      font-size: 20px;
-      font-weight: 700;
-      color: #333;
-      margin-top: 5px;
+    #scanBtn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    #scanBtn:disabled { background: #93c5fd; cursor: not-allowed; transform: none; }
+    
+    #stopBtn {
+      background: var(--danger);
+      color: white;
+      display: none;
     }
-    .dash-value.good { color: #28a745; }
-    .dash-value.bad { color: #dc3545; }
+    #stopBtn:hover { background: #dc2626; }
+    
+    .warning {
+        background: #fef2f2;
+        color: var(--danger);
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        text-align: center;
+        margin-bottom: 12px;
+        border: 1px solid #fee2e2;
+        font-weight: 600;
+        display: none;
+    }
+
+    /* --- Progress & Status --- */
+    #progressContainer {
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 8px;
+        display: none;
+    }
+    #progressBar { background: var(--success); height: 100%; width: 0%; transition: width 0.3s ease; }
+    
+    #status {
+        font-size: 12px;
+        color: var(--text-muted);
+        text-align: center;
+        min-height: 18px;
+        margin-bottom: 12px;
+        font-weight: 500;
+    }
+
+    /* --- Dashboard --- */
+    #dashboardView {
+        display: none;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .dash-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 4px;
+        text-align: center;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    .dash-label { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+    .dash-value { font-size: 20px; font-weight: 700; color: var(--text-main); line-height: 1.2; }
+    .dash-value.bad { color: var(--danger); }
+    .dash-value.good { color: var(--success); }
+
+    /* --- Results & Footer --- */
+    #results {
+        width: 100%;
+        height: 100px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        font-family: 'Consolas', monospace;
+        font-size: 11px;
+        resize: vertical;
+        background: #f8fafc;
+        color: var(--text-muted);
+        box-sizing: border-box;
+        margin-bottom: 12px;
+        outline: none;
+    }
+
+    .action-btn {
+        width: 100%;
+        padding: 8px;
+        margin-top: 8px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-main);
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        display: none;
+        transition: all 0.2s;
+    }
+    .action-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    
+    #downloadBtn {
+        background: #eff6ff;
+        color: var(--primary);
+        border: 1px solid #bfdbfe;
+    }
+    #downloadBtn:hover { background: #dbeafe; }
+
+    .signature {
+        text-align: center;
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 16px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
-  <h2>Amazon Listing Auditor & Scraper <span class="badge">v5.5</span></h2>
-  
-  <div class="mode-tabs">
-    <div class="mode-tab active" id="tabCurrent">Current Window</div>
-    <div class="mode-tab" id="tabBulk">Bulk Import (CSV/ASINs)</div>
-  </div>
-
-  <div id="bulkSection">
-    <div class="bulk-hint">Upload CSV with URLs or ASINs (one per line)</div>
-    <div class="file-input-wrapper">
-      <input type="file" id="csvInput" accept=".csv, .txt">
+  <div class="app-container">
+    <!-- Header -->
+    <div class="top-bar">
+        <h2>Listing Auditor for Amazon <span class="badge">v1.0.0</span></h2>
+        <button id="loginBtn" class="auth-btn">Login / Sign Up</button>
     </div>
     
-    <div class="bulk-controls">
-        <div class="control-row">
-            <label>Marketplace:</label>
-            <select id="domainSelect">
-                <!-- Populated by JS -->
-            </select>
+    <!-- Navigation Tabs -->
+    <div class="mode-tabs">
+      <div class="mode-tab active" id="tabCurrent">Current Window</div>
+      <div class="mode-tab disabled" id="tabBulk">Bulk Import <span class="lock-icon">🔒</span></div>
+    </div>
+
+    <!-- Bulk Settings Panel -->
+    <div id="bulkSection">
+      <div class="bulk-hint">Upload CSV with URLs or ASINs (one per line)</div>
+      <div class="file-input-wrapper">
+        <input type="file" id="csvInput" accept=".csv, .txt">
+      </div>
+      
+      <div class="bulk-controls">
+          <div class="control-row">
+              <label>Marketplace</label>
+              <select id="domainSelect"></select>
+          </div>
+          
+          <div class="control-row">
+              <label>Language</label>
+              <div style="display:flex; gap:8px;">
+                  <label style="font-weight:400"><input type="radio" name="langPref" value="english" checked> English</label>
+                  <label style="font-weight:400"><input type="radio" name="langPref" value="native"> Native</label>
+              </div>
+          </div>
+
+          <div class="control-row">
+              <label>Batch Size</label>
+              <input type="number" id="batchSizeInput" value="25" min="1" max="50" style="width: 50px;">
+          </div>
+          
+          <div class="control-row">
+              <label>Options</label>
+              <label style="font-weight:400; cursor:pointer;">
+                  <input type="checkbox" id="disableImages"> Disable Images (Faster)
+              </label>
+          </div>
+      </div>
+      <div id="fileStatus" style="font-size:11px; color:var(--success); margin-top:8px; font-weight:600;"></div>
+    </div>
+
+    <!-- Configuration Grid -->
+    <div class="options-container">
+      <div class="options-header">
+        <span>Audit Configuration</span>
+        <label style="cursor:pointer; display:flex; align-items:center;">
+            <input type="checkbox" id="selectAll" checked style="margin-right:4px;"> Select All
+        </label>
+      </div>
+      
+      <div id="attributesGrid" class="attributes-grid">
+        <!-- SCORE -->
+        <div class="section-label">
+            <span>Executive Summary</span> 
+            <span class="lock-icon">🔒</span>
         </div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="lqs" checked disabled> Listing Quality Score</label></div>
+        <div></div> <!-- Spacer -->
+
+        <!-- CORE DATA (Available to Guest) -->
+        <div class="section-label">
+            <span>Core Data (Free)</span>
+        </div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="marketplace" checked> Marketplace</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="brand" checked> Brand Name</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="metaTitle" checked> Page Title</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="mediaAsin" checked> ASIN</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="displayPrice" checked> Price</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="rating" checked> Rating (Stars)</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="reviews" checked> Review Count</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="url" checked> Page URL</label></div>
+
+        <!-- PRO DATA (Locked for Guest) -->
+        <div class="section-label">
+            <span>Advanced Data</span>
+            <span class="lock-icon">🔒</span>
+        </div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="parentAsin" checked disabled> Parent ASIN</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="stockStatus" checked disabled> Stock Status</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="soldBy" checked disabled> Sold By</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="bsr" checked disabled> Best Sellers Rank</label></div>
         
-        <div class="control-row">
-            <label>Language:</label>
-            <label><input type="radio" name="langPref" value="english" checked> English</label>
-            <label><input type="radio" name="langPref" value="native"> Domain Default</label>
+        <!-- DELIVERY DATES -->
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="freeDeliveryDate" checked disabled> Free Delivery</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="primeDeliveryDate" checked disabled> Prime Delivery</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="fastestDeliveryDate" checked disabled> Fastest Delivery</label></div>
+        <div></div>
+
+        <!-- AUDITOR FLAGS & CONTENT -->
+        <div class="section-label">
+            <span>Content Audit</span>
+            <span class="lock-icon">🔒</span>
         </div>
-
-        <div class="control-row">
-            <div>
-                <label for="batchSizeInput">Batch:</label>
-                <input type="number" id="batchSizeInput" value="25" min="1" max="50" style="width: 40px; padding: 2px;">
-            </div>
-            <label style="cursor: pointer; display: flex; align-items: center;">
-                <input type="checkbox" id="disableImages" style="margin-right: 4px;"> 
-                Disable Images
-            </label>
-        </div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="hasBullets" checked disabled> Has Bullet Points?</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="bullets" checked disabled> Bullet Points</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="hasDescription" checked disabled> Has Description?</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="description" checked disabled> Description</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="variationExists" checked disabled> Has Variations?</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="variationTheme" checked disabled> Variation Theme</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="variationCount" checked disabled> Variation Quantity</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="variationFamily" checked disabled> Variation Child ASINs</label></div> 
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="hasBrandStory" checked disabled> Has Brand Story?</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="brandStoryImgs" checked disabled> Brand Story Links</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="hasAplus" checked disabled> Has A+ Content?</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="aPlusImgs" checked disabled> A+ Content Links</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="hasVideo" checked disabled> Has Video?</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="videos" checked disabled> Videos Links</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="imgVariantCount" checked disabled> Image Link Count</label></div>
+        <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox pro-feature" value="imgVariantDetails" checked disabled> Image Link Details</label></div>
+      </div>
     </div>
+
+    <div class="warning" id="popupWarning">⚠ DO NOT CLOSE THIS WINDOW</div>
+
+    <div class="btn-group">
+      <button id="scanBtn">Start Audit (Current Tabs)</button>
+      <button id="stopBtn">Stop Scanning</button>
+    </div>
+
+    <div id="progressContainer"><div id="progressBar"></div></div>
+    <div id="status">Ready to scan.</div>
     
-    <div id="fileStatus" style="font-size:11px; color:#666; margin-top:5px;"></div>
-  </div>
-
-  <div class="options-container">
-    <div class="options-header">
-      <span>Audit Configuration</span>
-      <label style="cursor:pointer;"><input type="checkbox" id="selectAll" checked> Select All</label>
+    <!-- Dashboard (Hidden by default) -->
+    <div id="dashboardView">
+      <div class="dash-card">
+        <div class="dash-label">Audited</div>
+        <div class="dash-value" id="statTotal">-</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-label">Avg LQS</div>
+        <div class="dash-value" id="statLqs">-</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-label">Issues</div>
+        <div class="dash-value bad" id="statIssues">-</div>
+      </div>
     </div>
+
+    <textarea id="results" placeholder="Scan results will appear here..."></textarea>
     
-    <div id="attributesGrid" class="attributes-grid">
-      <!-- SCORE -->
-      <div class="section-label">Executive Summary</div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="lqs" checked> <strong>Listing Quality Score</strong></label></div>
+    <button id="copyBtn" class="action-btn">Copy JSON Data</button>
+    <button id="downloadBtn" class="action-btn">Download CSV Report</button>
 
-      <!-- CORE DATA -->
-      <div class="section-label">Core Listing Data</div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="marketplace" checked> Marketplace</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="brand" checked> Brand Name</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="metaTitle" checked> Page Title</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="mediaAsin" checked> ASIN</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="parentAsin" checked> Parent ASIN</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="displayPrice" checked> Price</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="stockStatus" checked> Stock Status</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="soldBy" checked> Sold By</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="rating" checked> Rating (Stars)</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="reviews" checked> Review Count</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="bsr" checked> Best Sellers Rank</label></div>
-      
-      <!-- DELIVERY DATES -->
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="freeDeliveryDate" checked> Free Delivery</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="primeDeliveryDate" checked> Prime Delivery</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="fastestDeliveryDate" checked> Fastest Delivery</label></div>
-
-      <!-- AUDITOR FLAGS & CONTENT -->
-      <div class="section-label">Content & Audit</div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="hasBullets" checked> Has Bullet Points?</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="bullets" checked> Bullet Points</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="hasDescription" checked> Has Description?</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="description" checked> Description</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="variationExists" checked> Has Variations?</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="variationTheme" checked> Variation Theme</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="variationCount" checked> Variation Quantity</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="variationFamily" checked> Variation Child ASINs</label></div> <!-- Renamed -->
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="hasBrandStory" checked> Has Brand Story?</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="brandStoryImgs" checked> Brand Story Links</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="hasAplus" checked> Has A+ Content?</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="aPlusImgs" checked> A+ Content Links</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="hasVideo" checked> Has Video?</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="videos" checked> Videos Links</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="imgVariantCount" checked> Image Link Count</label></div>
-      <div class="checkbox-item"><label><input type="checkbox" class="attr-checkbox" value="imgVariantDetails" checked> Image Link Details</label></div>
-      
-      <!-- PAGE URL (Always Last) -->
-      <div class="checkbox-item" style="grid-column: span 2; border-top: 1px solid #eee; padding-top: 5px; margin-top: 5px;"><label><input type="checkbox" class="attr-checkbox" value="url" checked> Page URL</label></div>
-    </div>
+    <div class="signature">Created by TransFamesh</div>
   </div>
-
-  <div class="warning" id="popupWarning">DO NOT CLOSE THIS WINDOW WHILE SCANNING</div>
-
-  <div class="btn-group">
-    <button id="scanBtn">Start Audit (Current Tabs)</button>
-    <button id="stopBtn">Stop</button>
-  </div>
-
-  <div id="progressContainer"><div id="progressBar"></div></div>
-  <div id="status">Ready to scan.</div>
-  
-  <!-- Dashboard (Hidden by default) -->
-  <div id="dashboardView">
-    <div class="dash-card">
-      <div class="dash-label">Total Audited</div>
-      <div class="dash-value" id="statTotal">-</div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">Avg LQS Score</div>
-      <div class="dash-value" id="statLqs">-</div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">Issues Found</div>
-      <div class="dash-value bad" id="statIssues">-</div>
-    </div>
-  </div>
-
-  <textarea id="results" placeholder="Results will appear here..."></textarea>
-  
-  <button id="copyBtn" class="action-btn">Copy JSON</button>
-  <button id="downloadBtn" class="action-btn">Download Audit Report</button>
-
-  <div class="signature">Created by TransFamesh</div>
 
   <script src="popup.js"></script>
 </body>

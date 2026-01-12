@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressContainer = document.getElementById('progressContainer');
   const progressBar = document.getElementById('progressBar');
   const domainSelect = document.getElementById('domainSelect');
+  const loginBtn = document.getElementById('loginBtn');
   
   // Dashboard Elements
   const dashboardView = document.getElementById('dashboardView');
@@ -25,11 +26,119 @@ document.addEventListener('DOMContentLoaded', () => {
   const statLqs = document.getElementById('statLqs');
   const statIssues = document.getElementById('statIssues');
 
+  // --- State Variables (Moved to top to fix ReferenceError) ---
   let allExtractedData = [];
   let isScanning = false;
   let mode = 'current'; // Default mode
   let rawCsvLines = []; // Store raw text for processing on Start
   
+  let IS_LOGGED_IN = false; 
+  let USER_INFO = null;
+  const GUEST_LIMIT = 10;
+
+  // --- Auth & Access Control ---
+  
+  // 1. Check if already logged in (Auto-login)
+  chrome.identity.getAuthToken({ interactive: false }, (token) => {
+      if (token && !chrome.runtime.lastError) {
+          fetchUserInfo(token);
+      }
+  });
+
+  // 2. Button Click Handler
+  loginBtn.addEventListener('click', () => {
+      if (IS_LOGGED_IN) {
+          // Logout Logic
+          chrome.identity.getAuthToken({ interactive: false }, (token) => {
+              if (token) {
+                  // Remove token from Chrome cache to effectively "logout"
+                  chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                      IS_LOGGED_IN = false;
+                      USER_INFO = null;
+                      updateUIForAuth();
+                      statusDiv.textContent = "Logged out successfully.";
+                  });
+              } else {
+                  IS_LOGGED_IN = false;
+                  updateUIForAuth();
+              }
+          });
+      } else {
+          // Login Logic
+          chrome.identity.getAuthToken({ interactive: true }, (token) => {
+              if (chrome.runtime.lastError) {
+                  console.error(chrome.runtime.lastError);
+                  // Common error: "OAuth2 not granted or revoked" -> means manifest client_id is wrong or user closed popup
+                  alert("Login failed: " + chrome.runtime.lastError.message + "\n\nDid you update the client_id in manifest.json?");
+                  return;
+              }
+              // Token acquired, now fetch user name/email
+              fetchUserInfo(token);
+          });
+      }
+  });
+
+  function fetchUserInfo(token) {
+      fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: 'Bearer ' + token }
+      })
+      .then(res => res.json())
+      .then(user => {
+          IS_LOGGED_IN = true;
+          USER_INFO = user;
+          updateUIForAuth();
+      })
+      .catch(err => {
+          console.error("User Info Fetch Error:", err);
+          statusDiv.textContent = "Error fetching user profile.";
+      });
+  }
+
+  function updateUIForAuth() {
+      if (IS_LOGGED_IN) {
+          const name = USER_INFO ? (USER_INFO.given_name || 'User') : 'Pro User';
+          loginBtn.textContent = `Logout (${name})`;
+          loginBtn.style.borderColor = "#22c55e"; // Green border to indicate success
+          
+          tabBulk.classList.remove('disabled');
+          tabBulk.querySelector('.lock-icon').style.display = 'none';
+          
+          // Enable Pro Features
+          document.querySelectorAll('.pro-feature').forEach(el => {
+              el.disabled = false;
+              el.checked = true;
+          });
+          document.querySelectorAll('.lock-icon').forEach(icon => {
+             if(icon.parentElement !== tabBulk) icon.style.display = 'none';
+          });
+          selectAllCheckbox.disabled = false;
+      } else {
+          loginBtn.textContent = "Login with Google";
+          loginBtn.style.borderColor = "#e2e8f0";
+
+          // Force switch to current tab if on bulk
+          if (mode === 'bulk') {
+              tabCurrent.click();
+          }
+          tabBulk.classList.add('disabled');
+          tabBulk.querySelector('.lock-icon').style.display = 'inline';
+
+          // Disable Pro Features
+          document.querySelectorAll('.pro-feature').forEach(el => {
+              el.checked = false;
+              el.disabled = true;
+          });
+           document.querySelectorAll('.section-label .lock-icon').forEach(icon => {
+             icon.style.display = 'inline';
+          });
+          selectAllCheckbox.checked = false;
+          selectAllCheckbox.disabled = true;
+      }
+  }
+
+  // Init UI
+  updateUIForAuth();
+
   // --- Multi-Marketplace Data ---
   const marketplaceData = {
     'Amazon.com': { root: 'https://www.amazon.com/dp/', en: '?language=en_US', native: '?language=en_US' },
@@ -122,6 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   tabBulk.addEventListener('click', () => {
+    if (!IS_LOGGED_IN) {
+        alert("This feature is for Registered Users only. Please Login.");
+        return;
+    }
     mode = 'bulk';
     tabBulk.classList.add('active');
     tabCurrent.classList.remove('active');
@@ -185,7 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   selectAllCheckbox.addEventListener('change', (e) => {
-    const checkboxes = document.querySelectorAll('.attr-checkbox');
+    // Only select enabled checkboxes
+    const checkboxes = document.querySelectorAll('.attr-checkbox:not(:disabled)');
     checkboxes.forEach(cb => cb.checked = e.target.checked);
   });
 
@@ -197,6 +311,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Main Scan Logic ---
   scanBtn.addEventListener('click', async () => {
+    if (mode === 'bulk' && !IS_LOGGED_IN) {
+        alert("Please login to use Bulk Audit.");
+        return;
+    }
+
     isScanning = true;
     scanBtn.style.display = 'none';
     stopBtn.style.display = 'block';
@@ -273,11 +392,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    statusDiv.textContent = `Auditing ${amazonTabs.length} tabs...`;
+    // Limit check for Guest
+    let tabsToProcess = amazonTabs;
+    if (!IS_LOGGED_IN && amazonTabs.length > GUEST_LIMIT) {
+        statusDiv.textContent = `Guest Limit: Processing first ${GUEST_LIMIT} tabs only...`;
+        tabsToProcess = amazonTabs.slice(0, GUEST_LIMIT);
+    } else {
+        statusDiv.textContent = `Auditing ${amazonTabs.length} tabs...`;
+    }
     
-    const promises = amazonTabs.map(async (tab, index) => {
+    const promises = tabsToProcess.map(async (tab, index) => {
        if (!isScanning) return null;
-       const percent = Math.round(((index + 1) / amazonTabs.length) * 100);
+       const percent = Math.round(((index + 1) / tabsToProcess.length) * 100);
        progressBar.style.width = `${percent}%`;
        return extractFromTab(tab.id, tab.url);
     });
@@ -413,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         statusDiv.textContent = `Completed! Scanned ${allExtractedData.length} listings.`;
         copyBtn.style.display = 'block';
-        downloadBtn.style.display = 'block';
+        downloadBtn.style.display = 'block'; // Always show download button
         
         if (mode === 'bulk') {
           downloadBtn.click();
@@ -435,6 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   downloadBtn.addEventListener('click', () => {
     if (allExtractedData.length === 0) return;
+    // Removed Login check to allow guests to download limited data
 
     const checkedBoxes = Array.from(document.querySelectorAll('.attr-checkbox:checked'));
     let csvHeader = "Status," + checkedBoxes.map(cb => cb.parentNode.textContent.trim()).join(",") + "\n";

@@ -1,19 +1,53 @@
 {
   "manifest_version": 3,
-  "name": "Amazon Listing Auditor & Scraper",
-  "version": "5.5",
-  "description": "Professional auditing tool for Amazon Agencies, Sellers and Vendors. Features Multi-marketplace support, LQS scoring, and stock/delivery audits.",
+  "name": "Listing Auditor for Amazon",
+  "version": "1.0.0",
+  "description": "Professional auditing tool for Amazon Sellers & Agencies. Features LQS, stock/delivery audits, and multi-marketplace support.",
   "permissions": [
     "tabs",
     "scripting",
     "activeTab",
-    "contentSettings"
+    "contentSettings",
+    "identity"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "*://*.amazon.com/*",
+    "*://*.amazon.ca/*",
+    "*://*.amazon.co.uk/*",
+    "*://*.amazon.de/*",
+    "*://*.amazon.fr/*",
+    "*://*.amazon.it/*",
+    "*://*.amazon.es/*",
+    "*://*.amazon.nl/*",
+    "*://*.amazon.se/*",
+    "*://*.amazon.com.be/*",
+    "*://*.amazon.com.au/*",
+    "*://*.amazon.sg/*",
+    "*://*.amazon.ae/*",
+    "*://*.amazon.sa/*",
+    "*://*.amazon.eg/*",
+    "*://*.amazon.in/*",
+    "*://*.amazon.co.jp/*"
   ],
+  "oauth2": {
+    "client_id": "789113929254-qqc9u8olmvj10i9g9lpqnjm24f2s248n.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Amazon Listing Auditor & Scraper"
+    "default_title": "Listing Auditor for Amazon",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   }
 }
