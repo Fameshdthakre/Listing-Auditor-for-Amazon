@@ -45,6 +45,26 @@
     // New: Marketplace
     const marketplace = window.location.hostname.replace('www.', '');
 
+													 // 3.1 Delivery Location (ZipCode extraction)
+	let deliveryLocation = "none";
+	try {
+		// Attempt 1: Regex on page source for JSON data (most robust for hidden state)
+		const zipMatch = pageSource.match(/"zipCode"\s*:\s*"([^"]+)"/);
+		const countryMatch = pageSource.match(/"countryCode"\s*:\s*"([^"]+)"/);
+
+		if (zipMatch && zipMatch[1] && countryMatch && countryMatch[1]) {
+			deliveryLocation = `${countryMatch[1]} - ${zipMatch[1]}`;
+		} else {
+			// Attempt 2: Glow Ingress Line (Visual Element)
+			const glowLine = document.querySelector('#glow-ingress-line2');
+			if (glowLine) {
+				deliveryLocation = glowLine.textContent.trim();
+			}
+		}
+	} catch(e) {
+		console.log("Loc extract error", e);
+	}
+
     // Brand
     const brandEl = document.querySelector('a[id="bylineInfo"]') || document.querySelector('div[id="bylineInfo"]');
     let brand = "none";
@@ -341,13 +361,17 @@
     while ((vMatch = videoRegex.exec(pageSource)) !== null) {
       videoSet.add(vMatch[1]);
     }
+
+
     
     const hostname = window.location.hostname;
     const domain = hostname.replace(/^www\.amazon\./, '');
     const videos = Array.from(videoSet).map(id => ({ 
       "video": `https://www.amazon.${domain}/vdp/${id}` 
     }));
-
+    
+	const videoCount = videos.length;
+	
     // Auditor Alerts
     const hasAplus = aPlusImgs.length > 0 ? "YES" : "NO";
     const hasBrandStory = brandStoryImgs.length > 0 ? "YES" : "NO";
