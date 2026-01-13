@@ -211,8 +211,8 @@
     if (deliveryBlock) {
         // Pre-selectors for known locations
         
-        // 1. PRIMARY MESSAGE (Using direct child > and generic price attribute to catch both FREE and Paid first occurrence)
-        const primaryMessageSpan = deliveryBlock.querySelector('div[id="mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE"] > span[data-csa-c-delivery-price]');
+        // 1. PRIMARY MESSAGE (Updated for Paid logic)
+        const primaryMessageSpan = deliveryBlock.querySelector('div[id*="mir-layout-DELIVERY_BLOCK"] > div[id*="mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE"] > span[data-csa-c-delivery-price]');
         if (primaryMessageSpan) {
              const priceType = primaryMessageSpan.getAttribute('data-csa-c-delivery-price');
              const time = primaryMessageSpan.getAttribute('data-csa-c-delivery-time');
@@ -227,15 +227,15 @@
              }
         }
         
-        // 2. SECONDARY MESSAGE (Using direct child > for FREE)
-        const secondaryMessage = deliveryBlock.querySelector('div[id="mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE"] > span[data-csa-c-delivery-price="FREE"]');
+        // 2. SECONDARY MESSAGE
+        const secondaryMessage = deliveryBlock.querySelector('div[id*="mir-layout-DELIVERY_BLOCK"] > div[id*="mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE"] > span[data-csa-c-delivery-price="FREE"]');
         if (secondaryMessage) {
              const time = secondaryMessage.getAttribute('data-csa-c-delivery-time');
              if(time) primeDeliveryDate = time;
         }
 
-        // 3. SECONDARY MESSAGE (Using direct child > for fastest)
-        const tertiaryMessage = deliveryBlock.querySelector('div[id="mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE"] > span[data-csa-c-delivery-price="fastest"]');
+        // 3. TERTIARY MESSAGE (Fastest)
+        const tertiaryMessage = deliveryBlock.querySelector('div[id*="mir-layout-DELIVERY_BLOCK"] > div[id*="mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE"] > span[data-csa-c-delivery-price="fastest"]');
         if (tertiaryMessage) {
              const time = tertiaryMessage.getAttribute('data-csa-c-delivery-time');
              if(time) fastestDeliveryDate = time;
