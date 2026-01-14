@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Listing Auditor for Amazon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Professional auditing tool for Amazon Sellers & Agencies. Features LQS, stock/delivery audits, and multi-marketplace support.",
   "permissions": [
     "tabs",
     "scripting",
     "activeTab",
     "contentSettings",
-    "identity"
+    "identity",
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "*://*.amazon.com/*",
@@ -29,6 +31,9 @@
     "*://*.amazon.in/*",
     "*://*.amazon.co.jp/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "oauth2": {
     "client_id": "789113929254-qqc9u8olmvj10i9g9lpqnjm24f2s248n.apps.googleusercontent.com",
     "scopes": [

@@ -45,6 +45,17 @@
     // New: Marketplace
     const marketplace = window.location.hostname.replace('www.', '');
 
+    // 3.1 Delivery Location (ZipCode extraction)
+    let deliveryLocation = "none";
+    try {
+        // Attempt 1: Regex on page source for JSON data (most robust for hidden state)
+        const zipMatch = pageSource.match(/"zipCode"\s*:\s*"([^"]+)"/);
+        const countryMatch = pageSource.match(/"countryCode"\s*:\s*"([^"]+)"/);
+        deliveryLocation = `${countryMatch[1]} - ${zipMatch[1]}`;
+    } catch(e) {
+        console.log("Loc extract error", e);
+    }
+
     // Brand
     const brandEl = document.querySelector('a[id="bylineInfo"]') || document.querySelector('div[id="bylineInfo"]');
     let brand = "none";
@@ -347,7 +358,9 @@
     const videos = Array.from(videoSet).map(id => ({ 
       "video": `https://www.amazon.${domain}/vdp/${id}` 
     }));
-
+    
+    const videoCount = videos.length;
+    
     // Auditor Alerts
     const hasAplus = aPlusImgs.length > 0 ? "YES" : "NO";
     const hasBrandStory = brandStoryImgs.length > 0 ? "YES" : "NO";
@@ -401,7 +414,9 @@
         hasVideo,
         hasBullets,
         hasDescription,
-        lqs
+        lqs,
+        videoCount,
+        deliveryLocation
       },
       data: items
     };
