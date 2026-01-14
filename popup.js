@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Elements ---
+  // Elements
   const scanBtn = document.getElementById('scanBtn');
   const stopBtn = document.getElementById('stopBtn');
   const copyBtn = document.getElementById('copyBtn');
@@ -26,28 +26,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const statLqs = document.getElementById('statLqs');
   const statIssues = document.getElementById('statIssues');
 
-  // --- State ---
+  // --- State Variables ---
   let mode = 'current'; 
   let rawCsvLines = [];
   let IS_LOGGED_IN = false; 
   let USER_INFO = null;
   const GUEST_LIMIT = 10;
   let countdownInterval = null;
-  
-  // --- Initialization ---
 
-  // 1. Auth Check
+  // --- Auth & Access Control ---
   chrome.identity.getAuthToken({ interactive: false }, (token) => {
-      if (token && !chrome.runtime.lastError) fetchUserInfo(token);
+      if (token && !chrome.runtime.lastError) {
+          fetchUserInfo(token);
+      }
   });
 
-  // 2. Initial State Load (Restores UI if scanning)
+  // State Load
   chrome.storage.local.get(['auditState'], (data) => {
     if (data.auditState) {
       renderState(data.auditState);
-      // Restore Mode UI
       if(data.auditState.mode === 'bulk' && data.auditState.isScanning) {
-        // Force visual update if running
         mode = 'bulk';
         tabBulk.classList.add('active');
         tabCurrent.classList.remove('active');
@@ -56,24 +54,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 3. Listen for Live Updates
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local' && changes.auditState) {
       renderState(changes.auditState.newValue);
     }
   });
 
-  // --- Auth Handlers ---
   loginBtn.addEventListener('click', () => {
       if (IS_LOGGED_IN) {
           chrome.identity.getAuthToken({ interactive: false }, (token) => {
-              if (token) chrome.identity.removeCachedAuthToken({ token: token }, () => {
+              if (token) {
+                  chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                      IS_LOGGED_IN = false;
+                      USER_INFO = null;
+                      updateUIForAuth();
+                      statusDiv.textContent = "Logged out successfully.";
+                  });
+              } else {
                   IS_LOGGED_IN = false;
-                  USER_INFO = null;
                   updateUIForAuth();
-                  statusDiv.textContent = "Logged out successfully.";
-              });
-              else { IS_LOGGED_IN = false; updateUIForAuth(); }
+              }
           });
       } else {
           chrome.identity.getAuthToken({ interactive: true }, (token) => {
@@ -87,10 +87,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function fetchUserInfo(token) {
-      fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: 'Bearer ' + token } })
+      fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: 'Bearer ' + token }
+      })
       .then(res => res.json())
-      .then(user => { IS_LOGGED_IN = true; USER_INFO = user; updateUIForAuth(); })
-      .catch(err => { console.error(err); statusDiv.textContent = "Error fetching profile."; });
+      .then(user => {
+          IS_LOGGED_IN = true;
+          USER_INFO = user;
+          updateUIForAuth();
+      })
+      .catch(err => {
+          console.error("User Info Fetch Error:", err);
+          statusDiv.textContent = "Error fetching user profile.";
+      });
   }
 
   function updateUIForAuth() {
@@ -100,23 +109,28 @@ document.addEventListener('DOMContentLoaded', () => {
           loginBtn.style.borderColor = "#22c55e"; 
           tabBulk.classList.remove('disabled');
           tabBulk.querySelector('.lock-icon').style.display = 'none';
-          document.querySelectorAll('.pro-feature').forEach(el => { el.disabled = false; el.checked = true; });
+          document.querySelectorAll('.pro-feature').forEach(el => {
+              el.disabled = false;
+              el.checked = true;
+          });
           selectAllCheckbox.disabled = false;
       } else {
           loginBtn.textContent = "Login with Google";
           loginBtn.style.borderColor = "#e2e8f0";
-          if (mode === 'bulk' && !document.getElementById('stopBtn').offsetParent) { // Only switch if not currently running
+          if (mode === 'bulk' && !document.getElementById('stopBtn').offsetParent) { 
             tabCurrent.click();
           }
           tabBulk.classList.add('disabled');
           tabBulk.querySelector('.lock-icon').style.display = 'inline';
-          document.querySelectorAll('.pro-feature').forEach(el => { el.checked = false; el.disabled = true; });
+          document.querySelectorAll('.pro-feature').forEach(el => {
+              el.checked = false;
+              el.disabled = true;
+          });
           selectAllCheckbox.checked = false;
           selectAllCheckbox.disabled = true;
       }
   }
 
-  // --- Marketplaces & inputs ---
   const marketplaceData = {
     'Amazon.com': { root: 'https://www.amazon.com/dp/', en: '?language=en_US', native: '?language=en_US' },
     'Amazon.ca': { root: 'https://www.amazon.ca/dp/', en: '?language=en_CA', native: '?language=en_CA' },
@@ -151,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (val < 1) batchSizeInput.value = 1;
   });
 
-  // --- URL Normalizer ---
   const buildOrNormalizeUrl = (input) => {
     input = input.trim();
     if(!input) return null;
@@ -169,7 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   };
 
-  // --- Tab Switching ---
   tabCurrent.addEventListener('click', () => {
     mode = 'current';
     tabCurrent.classList.add('active');
@@ -199,8 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(file);
   });
 
-  // --- Main Controls ---
-  
   scanBtn.addEventListener('click', async () => {
     let urlsToProcess = [];
 
@@ -226,7 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
         disableImages: (mode === 'bulk' && disableImagesInput.checked)
     };
     
-    // Start Background Scan
     chrome.runtime.sendMessage({
         action: 'START_SCAN',
         payload: { urls: urlsToProcess, mode, settings }
@@ -237,15 +246,12 @@ document.addEventListener('DOMContentLoaded', () => {
      chrome.runtime.sendMessage({ action: 'STOP_SCAN' });
   });
 
-  // --- Rendering & Logic Sync ---
-
   function renderState(state) {
       if (!state) return;
       
       const { isScanning, processedCount, urlsToProcess, results, statusMessage, nextActionTime } = state;
       const total = urlsToProcess.length;
 
-      // 1. Controls Visibility
       if (isScanning) {
           scanBtn.style.display = 'none';
           stopBtn.style.display = 'block';
@@ -271,14 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       }
 
-      // 2. Status & Progress
       statusDiv.innerHTML = statusMessage;
       if (total > 0) {
           const pct = Math.round((processedCount / total) * 100);
           progressBar.style.width = `${pct}%`;
       }
 
-      // 3. Countdown Timer (Visual only)
       if (countdownInterval) clearInterval(countdownInterval);
       
       if (isScanning && nextActionTime && nextActionTime > Date.now()) {
@@ -296,8 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
           countdownInterval = setInterval(updateTimer, 1000);
       }
   }
-
-  // --- Dashboard & Reporting ---
 
   function updateDashboard(results) {
       let totalLqs = 0;
@@ -319,10 +321,13 @@ document.addEventListener('DOMContentLoaded', () => {
       dashboardView.style.display = 'grid';
   }
 
-  // CSV Configuration
+  // Config - Updated for required fields
+  const forcedFields = ['marketplace', 'deliveryLocation', 'mediaAsin', 'url'];
+  
   const fieldConfig = {
     'lqs': { type: 'attr' },
     'marketplace': { type: 'attr' },
+    'deliveryLocation': { type: 'attr' }, 
     'brand': { type: 'attr' },
     'metaTitle': { type: 'attr' },
     'mediaAsin': { type: 'attr' },
@@ -333,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
     'rating': { type: 'attr' },
     'reviews': { type: 'attr' },
     'bsr': { type: 'attr' },
-    'deliveryLocation': { type: 'attr' }, 
     'freeDeliveryDate': { type: 'attr' },
     'primeDeliveryDate': { type: 'attr' },
     'fastestDeliveryDate': { type: 'attr' },
@@ -350,13 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
     'hasAplus': { type: 'attr' },
     'aPlusImgs': { type: 'attr' },
     'hasVideo': { type: 'attr' },
-	'videoCount': { type: 'attr' },    
+    'videoCount': { type: 'attr' },    
     'videos': { type: 'attr' },
     'imgVariantCount': { type: 'calc' },
     'imgVariantDetails': { type: 'calc' },
     'url': { type: 'root' }
-
-
   };
 
   const cleanAmazonUrl = (url) => {
@@ -364,62 +366,78 @@ document.addEventListener('DOMContentLoaded', () => {
     return url.replace(/\._[A-Z0-9,._-]+\./i, '.');
   };
 
-  downloadBtn.addEventListener('click', async () => {
+  const getExportData = async () => {
     const data = await chrome.storage.local.get('auditState');
     const results = data.auditState ? data.auditState.results : [];
+    if (!results || results.length === 0) return null;
 
-    if (!results || results.length === 0) return;
+    const checkedValues = Array.from(document.querySelectorAll('.attr-checkbox:checked')).map(cb => cb.value);
+    const finalFields = [...new Set([...forcedFields, ...checkedValues])]; 
 
-    const checkedBoxes = Array.from(document.querySelectorAll('.attr-checkbox:checked'));
-    let csvHeader = "Status," + checkedBoxes.map(cb => cb.parentNode.textContent.trim()).join(",") + "\n";
+    const now = new Date();
+    const pad = (num) => num.toString().padStart(2, '0');
+    const fileName = `Listing-Auditor_Report_${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+
+    const rows = results.map(tabData => {
+        if (tabData.error) {
+             const errRow = {}; finalFields.forEach(f => errRow[f] = (f === 'url' ? tabData.url : (f === 'marketplace' ? tabData.error : ''))); return errRow;
+        }
+        const row = {};
+        finalFields.forEach(id => {
+            const config = fieldConfig[id];
+            let val = 'none';
+            if (config) {
+                if (config.type === 'attr') val = tabData.attributes[id];
+                else if (config.type === 'root') val = tabData[id];
+                else if (config.type === 'calc') {
+                  if (id === 'imgVariantCount') val = tabData.data ? tabData.data.length : 0;
+                  else if (id === 'imgVariantDetails') {
+                    val = tabData.data ? tabData.data.map(item => ({
+                      variant: item.variant,
+                      hiRes: cleanAmazonUrl(item.hiRes),
+                      large: cleanAmazonUrl(item.large)
+                    })) : [];
+                  }
+                }
+            }
+            row[id] = val;
+        });
+        return row;
+    });
+
+    return { rows, fileName, fields: finalFields };
+  };
+
+  downloadBtn.addEventListener('click', async () => {
+    const exportData = await getExportData();
+    if (!exportData) return;
+
+    const headerMap = {
+        'deliveryLocation': 'Delivery Location',
+        'mediaAsin': 'ASIN',
+        'url': 'Page URL',
+        'videoCount': 'Video Count'
+    };
+    
+    let csvHeader = "Status," + exportData.fields.map(f => headerMap[f] || f).join(",") + "\n";
     let csvBody = "";
 
     const cleanField = (text) => {
+      // Allow 0 through, only block actual null/undefined
       if (text === null || text === undefined || text === 'none') return '"none"';
       if (typeof text === 'object') return `"${JSON.stringify(text).replace(/"/g, '""')}"`;
       return `"${String(text).replace(/"/g, '""').replace(/\n/g, ' ')}"`;
     };
 
-    results.forEach(tabData => {
-      if (tabData.error) {
-        csvBody += `${tabData.error} - ${tabData.title},"${tabData.url || 'Unknown'}"\n`;
-        return;
-      }
-
-      let row = "SUCCESS,";
-      checkedBoxes.forEach(cb => {
-        const id = cb.value;
-        const config = fieldConfig[id];
-        let val = 'none';
-        if (config) {
-            if (config.type === 'attr') val = tabData.attributes[id];
-            else if (config.type === 'root') val = tabData[id];
-            else if (config.type === 'calc') {
-              if (id === 'imgVariantCount') val = tabData.data ? tabData.data.length : 0;
-              else if (id === 'imgVariantDetails') {
-                val = tabData.data ? tabData.data.map(item => ({
-                  variant: item.variant,
-                  hiRes: cleanAmazonUrl(item.hiRes),
-                  large: cleanAmazonUrl(item.large)
-                })) : [];
-              }
-            }
-        }
-        row += cleanField(val) + ",";
-      });
-      csvBody += row.slice(0, -1) + "\n";
+    exportData.rows.forEach(row => {
+        csvBody += "SUCCESS," + exportData.fields.map(f => cleanField(row[f])).join(",") + "\n";
     });
-
-	// 2. Filename Format
-	const now = new Date();
-	const pad = (num) => num.toString().padStart(2, '0');
-	const fileName = `Listing-Auditor_Report_${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
 
     const blob = new Blob([csvHeader + csvBody], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", fileName);
+    link.setAttribute("download", exportData.fileName + ".csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
