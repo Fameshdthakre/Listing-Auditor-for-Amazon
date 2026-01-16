@@ -78,7 +78,10 @@ async function stopScan() {
 
   if (state) {
     if (state.batchTabIds && state.batchTabIds.length > 0) {
-      try { await chrome.tabs.remove(state.batchTabIds); } catch(e) {}
+      const validIds = state.batchTabIds.filter(id => id !== null);
+      if (validIds.length > 0) {
+        try { await chrome.tabs.remove(validIds); } catch(e) {}
+      }
     }
     
     state.isScanning = false;
@@ -133,15 +136,18 @@ async function openBatchTabs(state) {
   state.nextActionTime = extractionTime; 
   await chrome.storage.local.set({ auditState: state });
 
-  const tabIds = [];
-  for (const item of batchItems) {
+  const tabPromises = batchItems.map(async (item) => {
     try {
       const url = item.url || item;
       const tab = await chrome.tabs.create({ url: url, active: false });
-      tabIds.push(tab.id);
-    } catch(e) { console.error(e); }
-  }
+      return tab.id;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  });
 
+  const tabIds = await Promise.all(tabPromises);
   state.batchTabIds = tabIds;
   await chrome.storage.local.set({ auditState: state });
 
@@ -168,9 +174,18 @@ async function extractBatchData(state) {
   let captchaTabId = null;
 
   const scriptPromises = tabIds.map(async (tabId, index) => {
-      const res = await extractFromTab(tabId);
       const item = batchItems[index];
       const originalUrl = item.url || item;
+
+      if (!tabId) {
+        return {
+          error: "tab_creation_failed",
+          url: originalUrl,
+          queryASIN: getAsinFromUrl(originalUrl)
+        };
+      }
+
+      const res = await extractFromTab(tabId);
       
       if (res) {
           if (res.error === "CAPTCHA_DETECTED") {
@@ -229,8 +244,9 @@ async function extractBatchData(state) {
     if (res && (res.found || res.error)) results.push(res);
   });
 
-  if (tabIds.length > 0) {
-    try { await chrome.tabs.remove(tabIds); } catch(e) {}
+  const validTabIds = tabIds.filter(id => id !== null);
+  if (validTabIds.length > 0) {
+    try { await chrome.tabs.remove(validTabIds); } catch(e) {}
   }
 
   state.results.push(...results);
@@ -291,8 +307,3 @@ function getRandomDivisible(min, max, step) {
   const randomStep = Math.floor(Math.random() * (steps + 1));
   return min + (randomStep * step);
 }
-
-// --- Side Panel Configuration ---
-chrome.sidePanel
-  .setPanelBehavior({ openPanelOnActionClick: true })
-  .catch((error) => console.error(error));
