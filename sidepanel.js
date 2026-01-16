@@ -957,6 +957,46 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Export Helpers ---
+  const MASTER_COLUMNS = [
+    { key: 'status', header: 'status' },
+    { key: 'marketplace', header: 'marketPlace' },
+    { key: 'deliveryLocation', header: 'deliveryLocation' },
+    { key: 'url', header: 'pageURL' },
+    { key: 'queryASIN', header: 'queryASIN' },
+    { key: 'mediaAsin', header: 'pageASIN' },
+    { key: 'parentAsin', header: 'parentAsin' },
+    { key: 'lqs', header: 'lqs' },
+    { key: 'displayPrice', header: 'displayPrice' },
+    { key: 'stockStatus', header: 'stockStatus' },
+    { key: 'freeDeliveryDate', header: 'freeDeliveryDate' },
+    { key: 'paidDeliveryDate', header: 'paidDeliveryDate' },
+    { key: 'primeOrFastestDeliveryDate', header: 'primeOrFastestDeliveryDate' },
+    { key: 'soldBy', header: 'soldBy' },
+    { key: 'rating', header: 'rating' },
+    { key: 'reviews', header: 'reviews' },
+    { key: 'bsr', header: 'bestSellersRank' },
+    { key: 'brand', header: 'brand' },
+    { key: 'metaTitle', header: 'metaTitle' },
+    { key: 'hasBullets', header: 'hasBullets' },
+    { key: 'bulletsCount', header: 'bulletsCount' },
+    { key: 'bullets', header: 'bullets' },
+    { key: 'hasDescription', header: 'hasDescription' },
+    { key: 'description', header: 'description' },
+    { key: 'variationExists', header: 'variationExists' },
+    { key: 'variationTheme', header: 'variationTheme' },
+    { key: 'variationCount', header: 'variationCount' },
+    { key: 'variationFamily', header: 'variationFamily' },
+    { key: 'hasBrandStory', header: 'hasBrandStory' },
+    { key: 'brandStoryImgs', header: 'brandStoryImgs' },
+    { key: 'hasAplus', header: 'hasAplus' },
+    { key: 'aPlusImgs', header: 'aPlusImgs' },
+    { key: 'hasVideo', header: 'hasVideo' },
+    { key: 'videoCount', header: 'videoCount' },
+    { key: 'videos', header: 'videos' },
+    { key: 'imgVariantCount', header: 'imgVariantCount' },
+    { key: 'imgVariantDetails', header: 'imgVariantDetails' }
+  ];
+
   const forcedFields = ['marketplace', 'deliveryLocation', 'mediaAsin', 'url', 'queryASIN'];
   const fieldConfig = {
     'lqs': { type: 'attr' },
@@ -1005,35 +1045,53 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!results || results.length === 0) return null;
 
     const checkedValues = Array.from(document.querySelectorAll('.attr-checkbox:checked')).map(cb => cb.value);
-    const finalFields = [...new Set([...forcedFields, ...checkedValues])]; 
+    const selectedFields = [...new Set([...forcedFields, ...checkedValues])];
+
+    // Sort fields based on MASTER_COLUMNS sequence
+    const finalFields = [];
+    MASTER_COLUMNS.forEach(col => {
+        if (selectedFields.includes(col.key)) {
+            finalFields.push(col.key);
+        }
+    });
 
     const now = new Date();
     const pad = (num) => num.toString().padStart(2, '0');
     const fileName = `Listing-Auditor_Report_${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
 
-    const headerMap = {
-        'deliveryLocation': 'Delivery Location',
-        'mediaAsin': 'Page ASIN', 
-        'queryASIN': 'Query ASIN',
-        'url': 'Page URL',
-        'videoCount': 'Video Count'
-    };
+    // Helper map for quick header lookup
+    const keyToHeader = {};
+    MASTER_COLUMNS.forEach(c => keyToHeader[c.key] = c.header);
 
-    // Construct Header list with correct order for Excel/GSheet
-    const finalHeaders = ["Status", ...finalFields.map(f => headerMap[f] || f)];
+    // Construct Header list with correct order
+    const finalHeaders = finalFields.map(f => keyToHeader[f] || f);
+
+    // Add expected headers if data exists
     const hasExpectedData = results.some(r => r.expected);
     if (hasExpectedData) {
         finalHeaders.push("Expected Title", "Title Match", "Expected Bullets", "Bullets Match", "Initial Price", "Price Change");
     }
 
     let csvHeader = finalHeaders.join(",") + "\n";
-    let csvBody = "";
 
     const cleanField = (text) => {
       if (text === null || text === undefined || text === 'none') return '"none"';
       if (typeof text === 'object') return `"${JSON.stringify(text).replace(/"/g, '""')}"`;
       return `"${String(text).replace(/"/g, '""').replace(/\n/g, ' ')}"`;
     };
+
+    // --- Tab Data Containers ---
+    const tabsData = [];
+    const createTab = (name, headers) => ({ name, headers, rows: [] });
+
+    // Only create tabs if the parent field is selected
+    const tabMap = {};
+    if (selectedFields.includes('variationFamily')) tabMap.variationFamily = createTab('variationFamily', ['pageASIN']);
+    if (selectedFields.includes('bullets')) tabMap.bullets = createTab('bullets', ['pageASIN']);
+    if (selectedFields.includes('brandStoryImgs')) tabMap.brandStoryImgs = createTab('brandStoryImgs', ['pageASIN']);
+    if (selectedFields.includes('aPlusImgs')) tabMap.aPlusImgs = createTab('aPlusImgs', ['pageASIN']);
+    if (selectedFields.includes('videos')) tabMap.videos = createTab('videos', ['pageASIN']);
+    if (selectedFields.includes('imgVariantDetails')) tabMap.imgVariantDetails = createTab('imgVariantDetails', ['pageASIN', 'variant', 'hiRes', 'large']);
 
     const rows = results.map(tabData => {
         let rowStatus = "SUCCESS";
@@ -1045,32 +1103,94 @@ document.addEventListener('DOMContentLoaded', () => {
             if (qAsin !== 'none' && pAsin !== 'none' && qAsin !== pAsin) rowStatus = "ASIN Redirect";
         }
 
-        const row = { Status: rowStatus };
+        const row = {};
         
         if (tabData.error) {
-             const errRow = {}; 
-             finalFields.forEach(f => errRow[f] = (f === 'url' ? tabData.url : (f === 'marketplace' ? tabData.error : ''))); 
-             finalFields.forEach(f => row[f] = errRow[f]);
+             finalFields.forEach(f => {
+                 let val = '';
+                 if (f === 'status') val = "ERROR";
+                 else if (f === 'url') val = tabData.url || '';
+                 else if (f === 'marketplace') val = tabData.error;
+                 row[keyToHeader[f] || f] = val;
+             });
         } else {
+            const pageASIN = tabData.attributes.mediaAsin || 'none';
+
             finalFields.forEach(id => {
-                const config = fieldConfig[id];
                 let val = 'none';
-                if (config) {
-                    if (config.type === 'attr') val = tabData.attributes[id];
-                    else if (config.type === 'root') val = tabData[id];
-                    else if (config.type === 'calc') {
-                      if (id === 'imgVariantCount') val = tabData.data ? tabData.data.length : 0;
-                      else if (id === 'imgVariantDetails') {
-                        val = tabData.data ? JSON.stringify(tabData.data.map(item => ({
-                            variant: item.variant,
-                            hiRes: cleanAmazonUrl(item.hiRes),
-                            large: cleanAmazonUrl(item.large)
-                        }))) : [];
-                      }
+                if (id === 'status') {
+                    val = rowStatus;
+                } else {
+                    const config = fieldConfig[id];
+                    if (config) {
+                        if (config.type === 'attr') val = tabData.attributes[id];
+                        else if (config.type === 'root') val = tabData[id];
+                        else if (config.type === 'calc') {
+                          if (id === 'imgVariantCount') val = tabData.data ? tabData.data.length : 0;
+                          else if (id === 'imgVariantDetails') {
+                            val = tabData.data ? JSON.stringify(tabData.data.map(item => ({
+                                variant: item.variant,
+                                hiRes: cleanAmazonUrl(item.hiRes),
+                                large: cleanAmazonUrl(item.large)
+                            }))) : [];
+                          }
+                        }
                     }
                 }
-                row[headerMap[id] || id] = val; // Use mapped name key
+                row[keyToHeader[id] || id] = val;
             });
+
+            // --- Populate Extra Tabs ---
+            if (tabMap.variationFamily) {
+                let vFamilies = [];
+                try {
+                    const raw = tabData.attributes.variationFamily;
+                    if (raw && raw !== 'none') vFamilies = JSON.parse(raw);
+                } catch(e) {}
+                if (Array.isArray(vFamilies) && vFamilies.length > 0) {
+                    tabMap.variationFamily.rows.push([pageASIN, ...vFamilies]);
+                }
+            }
+            if (tabMap.bullets) {
+                const bText = tabData.attributes.bullets;
+                if (bText && bText !== 'none') {
+                    const bList = bText.split('|').map(s => s.trim());
+                    tabMap.bullets.rows.push([pageASIN, ...bList]);
+                }
+            }
+            if (tabMap.brandStoryImgs) {
+                const bs = tabData.attributes.brandStoryImgs;
+                if (Array.isArray(bs) && bs.length > 0) {
+                    const urls = bs.map(item => item['brand-story-image']);
+                    tabMap.brandStoryImgs.rows.push([pageASIN, ...urls]);
+                }
+            }
+            if (tabMap.aPlusImgs) {
+                const ap = tabData.attributes.aPlusImgs;
+                if (Array.isArray(ap) && ap.length > 0) {
+                    const urls = ap.map(item => item['a-plus-image']);
+                    tabMap.aPlusImgs.rows.push([pageASIN, ...urls]);
+                }
+            }
+            if (tabMap.videos) {
+                const vids = tabData.attributes.videos;
+                if (Array.isArray(vids) && vids.length > 0) {
+                    const urls = vids.map(item => item['video_url']);
+                    tabMap.videos.rows.push([pageASIN, ...urls]);
+                }
+            }
+            if (tabMap.imgVariantDetails) {
+                if (tabData.data && Array.isArray(tabData.data)) {
+                    tabData.data.forEach(d => {
+                        tabMap.imgVariantDetails.rows.push([
+                            pageASIN,
+                            d.variant,
+                            cleanAmazonUrl(d.hiRes),
+                            cleanAmazonUrl(d.large)
+                        ]);
+                    });
+                }
+            }
         }
 
         if (hasExpectedData) {
@@ -1107,11 +1227,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return { rowObj: row, csvLine: rowStr };
     });
 
+    Object.values(tabMap).forEach(tab => tabsData.push(tab));
+
     return { 
         rows: rows.map(r => r.rowObj), 
         fileName, 
         csvContent: csvHeader + rows.map(r => r.csvLine).join("\n"),
-        headers: finalHeaders // IMPORTANT: Used by GSheet and Excel logic
+        headers: finalHeaders,
+        tabsData // Secondary tabs
     };
   };
 
@@ -1183,6 +1306,15 @@ document.addEventListener('DOMContentLoaded', () => {
       XLSX.utils.book_append_sheet(wb, wsDash, "Dashboard");
       const wsData = XLSX.utils.json_to_sheet(exportData.rows, { header: exportData.headers });
       XLSX.utils.book_append_sheet(wb, wsData, "Audit Data");
+
+      // Append Secondary Tabs
+      if (exportData.tabsData) {
+          exportData.tabsData.forEach(tab => {
+              const ws = XLSX.utils.aoa_to_sheet([tab.headers, ...tab.rows]);
+              XLSX.utils.book_append_sheet(wb, ws, tab.name);
+          });
+      }
+
       XLSX.writeFile(wb, exportData.fileName + ".xlsx");
   });
 
@@ -1197,14 +1329,53 @@ document.addEventListener('DOMContentLoaded', () => {
       statusDiv.textContent = "Creating Google Sheet...";
       try {
           const exportData = await getExportData(); if(!exportData) return;
-          const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ properties: { title: exportData.fileName } }) });
+
+          // Prepare Sheets array for creation
+          const sheets = [{ properties: { title: 'Audit Data' } }];
+          const dataToPush = [];
+
+          // Main Data
+          const mainValues = [exportData.headers];
+          exportData.rows.forEach(r => { mainValues.push(exportData.headers.map(h => r[h])); });
+          dataToPush.push({ range: "'Audit Data'!A1", values: mainValues });
+
+          // Secondary Tabs
+          if (exportData.tabsData) {
+              exportData.tabsData.forEach(tab => {
+                  sheets.push({ properties: { title: tab.name } });
+                  const tabValues = [tab.headers, ...tab.rows];
+                  dataToPush.push({ range: `'${tab.name}'!A1`, values: tabValues });
+              });
+          }
+
+          // Create Spreadsheet with all sheets
+          const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  properties: { title: exportData.fileName },
+                  sheets: sheets
+              })
+          });
+
           if(!createRes.ok) throw new Error("Failed to create sheet");
           const sheetData = await createRes.json();
-          const spreadsheetId = sheetData.spreadsheetId; const sheetUrl = sheetData.spreadsheetUrl;
-          const values = [exportData.headers]; exportData.rows.forEach(r => { values.push(exportData.headers.map(h => r[h])); });
+          const spreadsheetId = sheetData.spreadsheetId;
+          const sheetUrl = sheetData.spreadsheetUrl;
+
           statusDiv.textContent = "Pushing data...";
-          const appendRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: values }) });
-          if(!appendRes.ok) throw new Error("Failed to append data");
+
+          // Batch Update Values
+          const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  valueInputOption: 'USER_ENTERED',
+                  data: dataToPush
+              })
+          });
+
+          if(!updateRes.ok) throw new Error("Failed to append data");
           statusDiv.textContent = "Success! Opening Sheet..."; window.open(sheetUrl, '_blank');
       } catch(e) { console.error(e); alert("Error pushing to Google Sheet: " + e.message); statusDiv.textContent = "Error."; }
   }
@@ -1267,6 +1438,14 @@ document.addEventListener('DOMContentLoaded', () => {
           XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), "Dashboard");
           XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData.rows, { header: exportData.headers }), "Audit Data");
           
+          // Append Secondary Tabs
+          if (exportData.tabsData) {
+              exportData.tabsData.forEach(tab => {
+                  const ws = XLSX.utils.aoa_to_sheet([tab.headers, ...tab.rows]);
+                  XLSX.utils.book_append_sheet(wb, ws, tab.name);
+              });
+          }
+
           // Generate ArrayBuffer
           const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
           
