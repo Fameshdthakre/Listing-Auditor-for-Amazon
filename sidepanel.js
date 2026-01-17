@@ -46,6 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearWatchlistBtn = document.getElementById('clearWatchlistBtn');
   const auditWatchlistBtn = document.getElementById('auditWatchlistBtn');
 
+  // New Watchlist Controls
+  const watchlistSelect = document.getElementById('watchlistSelect');
+  const newWatchlistBtn = document.getElementById('newWatchlistBtn');
+  const renameWatchlistBtn = document.getElementById('renameWatchlistBtn');
+  const deleteWatchlistBtn = document.getElementById('deleteWatchlistBtn');
+
   // Clear Elements
   const clearSection = document.getElementById('clearSection');
   const clearBtn = document.getElementById('clearBtn');
@@ -126,6 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize on load
   initTheme();
+  initWatchlists(() => {
+      loadWatchlist();
+  });
 
   // --- Feature: Preview Table ---
   previewBtn.addEventListener('click', async () => {
@@ -164,22 +173,114 @@ document.addEventListener('DOMContentLoaded', () => {
   modalDownloadBtn.addEventListener('click', () => downloadXlsxBtn.click());
 
   // --- Feature: Watchlist Logic (Updated for Price & Separate Storage) ---
-  const getWatchlistKey = () => IS_LOGGED_IN ? 'watchlist_pro' : 'watchlist';
+  const getWatchlistContainerKey = () => IS_LOGGED_IN ? 'watchlists_pro' : 'watchlists_guest';
+  let currentWatchlistId = "default";
+
+  // Init Watchlists structure if missing
+  const initWatchlists = (cb) => {
+      const key = getWatchlistContainerKey();
+      chrome.storage.local.get([key, 'watchlist', 'watchlist_pro'], (data) => {
+          let container = data[key];
+
+          // Migration from old array format to new object format
+          if (!container) {
+              container = { "default": { name: "Main Watchlist", items: [], template: [] } };
+              // Try to migrate old data
+              const oldKey = IS_LOGGED_IN ? 'watchlist_pro' : 'watchlist';
+              if (data[oldKey] && Array.isArray(data[oldKey])) {
+                  container["default"].items = data[oldKey];
+              }
+              chrome.storage.local.set({ [key]: container }, cb);
+          } else {
+              if (cb) cb();
+          }
+      });
+  };
 
   const loadWatchlist = () => {
-      const key = getWatchlistKey();
+      const key = getWatchlistContainerKey();
       chrome.storage.local.get([key], (data) => {
-          const list = data[key] || [];
-          renderWatchlist(list);
+          const container = data[key] || { "default": { name: "Main Watchlist", items: [], template: [] } };
+
+          // Populate Select Dropdown
+          watchlistSelect.innerHTML = "";
+          Object.keys(container).forEach(id => {
+              const opt = document.createElement("option");
+              opt.value = id;
+              opt.textContent = container[id].name;
+              watchlistSelect.appendChild(opt);
+          });
+
+          if (!container[currentWatchlistId]) currentWatchlistId = "default";
+          watchlistSelect.value = currentWatchlistId;
+
+          const activeList = container[currentWatchlistId];
+          renderWatchlist(activeList ? activeList.items : []);
+
           if (IS_LOGGED_IN) { watchlistLimitMsg.textContent = `Limit: Unlimited (Pro)`; watchlistLimitMsg.style.color = "var(--success)"; } 
           else { watchlistLimitMsg.textContent = `Limit: ${WATCHLIST_GUEST_LIMIT} (Free)`; watchlistLimitMsg.style.color = "var(--text-muted)"; }
       });
   };
 
-  const addToWatchlist = (items) => {
-      const key = getWatchlistKey();
+  watchlistSelect.addEventListener('change', (e) => {
+      currentWatchlistId = e.target.value;
+      loadWatchlist();
+  });
+
+  newWatchlistBtn.addEventListener('click', () => {
+      const name = prompt("Enter new watchlist name:");
+      if (name) {
+          const id = "wl_" + Date.now();
+          const key = getWatchlistContainerKey();
+          chrome.storage.local.get([key], (data) => {
+              const container = data[key] || {};
+              container[id] = { name: name, items: [], template: [] };
+              chrome.storage.local.set({ [key]: container }, () => {
+                  currentWatchlistId = id;
+                  // Trigger template selection for new list (Feature 2 stub)
+                  selectAttributesForTemplate(id);
+              });
+          });
+      }
+  });
+
+  renameWatchlistBtn.addEventListener('click', () => {
+      const key = getWatchlistContainerKey();
       chrome.storage.local.get([key], (data) => {
-          let list = data[key] || [];
+          const container = data[key];
+          if (container && container[currentWatchlistId]) {
+              const newName = prompt("Rename watchlist:", container[currentWatchlistId].name);
+              if (newName) {
+                  container[currentWatchlistId].name = newName;
+                  chrome.storage.local.set({ [key]: container }, loadWatchlist);
+              }
+          }
+      });
+  });
+
+  deleteWatchlistBtn.addEventListener('click', () => {
+      if (Object.keys(watchlistSelect.options).length <= 1) {
+          alert("Cannot delete the last watchlist.");
+          return;
+      }
+      if (confirm("Delete this watchlist?")) {
+          const key = getWatchlistContainerKey();
+          chrome.storage.local.get([key], (data) => {
+              const container = data[key];
+              delete container[currentWatchlistId];
+              currentWatchlistId = Object.keys(container)[0];
+              chrome.storage.local.set({ [key]: container }, loadWatchlist);
+          });
+      }
+  });
+
+  const addToWatchlist = (items) => {
+      const key = getWatchlistContainerKey();
+      chrome.storage.local.get([key], (data) => {
+          let container = data[key] || { "default": { name: "Main Watchlist", items: [], template: [] } };
+          if(!container[currentWatchlistId]) container[currentWatchlistId] = { name: "Default", items: [], template: [] };
+
+          let list = container[currentWatchlistId].items;
           const limit = IS_LOGGED_IN ? WATCHLIST_PRO_LIMIT : WATCHLIST_GUEST_LIMIT;
           const newAsins = items.filter(newItem => !list.some(existing => existing.asin === newItem.asin));
           
@@ -198,11 +299,14 @@ document.addEventListener('DOMContentLoaded', () => {
                   title: newItem.expected ? newItem.expected.title : null 
               };
 
+              // Filter attributes based on template (if exists)
+              // This ensures we only store what the user wanted if they set up a template
+              // For now, we store everything but we can use the template for view/export logic later.
+
               if (existingIndex > -1) {
                   // Merge and update
                   const existing = list[existingIndex];
                   const newHistory = existing.history ? [...existing.history, historyEntry] : [historyEntry];
-                  // Keep last 5 history items
                   if (newHistory.length > 5) newHistory.shift();
 
                   list[existingIndex] = { 
@@ -222,7 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
               }
           });
           
-          chrome.storage.local.set({ [key]: list }, () => {
+          container[currentWatchlistId].items = list;
+
+          chrome.storage.local.set({ [key]: container }, () => {
               loadWatchlist();
               if (mode === 'current') {
                   pasteStatus.textContent = `Saved to Watchlist!`;
@@ -237,18 +343,26 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const removeFromWatchlist = (asin) => {
-      const key = getWatchlistKey();
+      const key = getWatchlistContainerKey();
       chrome.storage.local.get([key], (data) => {
-          let list = data[key] || [];
-          const newList = list.filter(item => item.asin !== asin);
-          chrome.storage.local.set({ [key]: newList }, loadWatchlist);
+          let container = data[key];
+          if(container && container[currentWatchlistId]) {
+              container[currentWatchlistId].items = container[currentWatchlistId].items.filter(item => item.asin !== asin);
+              chrome.storage.local.set({ [key]: container }, loadWatchlist);
+          }
       });
   };
 
   const clearWatchlist = () => {
-      if (confirm("Are you sure you want to clear your entire watchlist?")) {
-          const key = getWatchlistKey();
-          chrome.storage.local.set({ [key]: [] }, loadWatchlist);
+      if (confirm("Are you sure you want to clear items in this watchlist?")) {
+          const key = getWatchlistContainerKey();
+          chrome.storage.local.get([key], (data) => {
+              let container = data[key];
+              if(container && container[currentWatchlistId]) {
+                  container[currentWatchlistId].items = [];
+                  chrome.storage.local.set({ [key]: container }, loadWatchlist);
+              }
+          });
       }
   };
 
@@ -1641,3 +1755,123 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => copyBtn.textContent = 'Copy JSON Data', 1500);
   });
 });
+  // --- Feature 2: Attribute Templates ---
+  const selectAttributesForTemplate = (watchlistId) => {
+      // Show existing audit config panel but in "Template Mode"
+      const modal = document.createElement('dialog');
+      modal.style.padding = '0';
+      modal.style.border = 'none';
+      modal.style.borderRadius = '8px';
+      modal.style.width = '400px';
+      modal.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+
+      const header = document.createElement('div');
+      header.className = 'modal-header';
+      header.innerHTML = '<span>Select Attributes to Track</span>';
+
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+      body.style.padding = '12px';
+      body.style.maxHeight = '300px';
+      body.style.overflowY = 'auto';
+
+      // Clone existing grid but reset inputs
+      const grid = document.getElementById('attributesGrid').cloneNode(true);
+      grid.querySelectorAll('input').forEach(input => {
+          input.disabled = false;
+          input.checked = false; // Default off, let user pick
+      });
+      // Default core attributes
+      ['mediaAsin', 'metaTitle', 'displayPrice'].forEach(val => {
+          const cb = grid.querySelector(`input[value="${val}"]`);
+          if(cb) cb.checked = true;
+      });
+
+      body.appendChild(grid);
+
+      const footer = document.createElement('div');
+      footer.className = 'modal-footer';
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Save Template';
+      saveBtn.className = 'auth-btn';
+      saveBtn.style.background = 'var(--primary)';
+      saveBtn.style.color = 'white';
+
+      saveBtn.onclick = () => {
+          const selected = Array.from(grid.querySelectorAll('input.attr-checkbox:checked')).map(cb => cb.value);
+          const key = getWatchlistContainerKey();
+          chrome.storage.local.get([key], (data) => {
+              const container = data[key];
+              if (container && container[watchlistId]) {
+                  container[watchlistId].template = selected;
+                  chrome.storage.local.set({ [key]: container }, () => {
+                      modal.close();
+                      alert("Template saved! Future imports/snapshots will highlight these attributes.");
+                  });
+              }
+          });
+      };
+
+      footer.appendChild(saveBtn);
+      modal.appendChild(header);
+      modal.appendChild(body);
+      modal.appendChild(footer);
+      document.body.appendChild(modal);
+      modal.showModal();
+  };
+
+  // Add "Edit Template" Button next to controls
+  const editTemplateBtn = document.createElement('button');
+  editTemplateBtn.textContent = '⚙️';
+  editTemplateBtn.title = 'Edit Attribute Template';
+  editTemplateBtn.style.padding = '6px';
+  editTemplateBtn.style.width = 'auto';
+  editTemplateBtn.style.flex = 'none';
+  editTemplateBtn.onclick = () => selectAttributesForTemplate(currentWatchlistId);
+  document.getElementById('deleteWatchlistBtn').before(editTemplateBtn);
+
+  // New Feature: Download Template CSV
+  const downloadTemplateBtn = document.createElement('button');
+  downloadTemplateBtn.textContent = '📥 Get CSV Template';
+  downloadTemplateBtn.className = 'action-btn';
+  downloadTemplateBtn.style.marginTop = '8px';
+  downloadTemplateBtn.style.display = 'block';
+  downloadTemplateBtn.style.width = '100%';
+
+  downloadTemplateBtn.onclick = () => {
+      const key = getWatchlistContainerKey();
+      chrome.storage.local.get([key], (data) => {
+          const container = data[key];
+          const template = (container && container[currentWatchlistId] && container[currentWatchlistId].template.length > 0)
+                           ? container[currentWatchlistId].template
+                           : ['url', 'queryASIN', 'expected title', 'expected bullets', 'initial price']; // Default if empty
+
+          // Ensure mandatory fields for import match the CSV parser logic
+          let headers = ['URL', 'ASIN']; // Mandatory for parser logic
+
+          // Map internal keys to CSV headers (simplification)
+          const attrToHeader = {
+              'metaTitle': 'Expected Title',
+              'bullets': 'Expected Bullets',
+              'displayPrice': 'Initial Price'
+          };
+
+          template.forEach(attr => {
+              if (attrToHeader[attr] && !headers.includes(attrToHeader[attr])) headers.push(attrToHeader[attr]);
+              else if (!headers.includes(attr) && attr !== 'url' && attr !== 'queryASIN' && attr !== 'mediaAsin') headers.push(attr);
+          });
+
+          const csvContent = headers.join(",") + "\n";
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `Template_${container[currentWatchlistId].name}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      });
+  };
+
+  // Insert download button in Watchlist section
+  document.getElementById('watchlistSection').appendChild(downloadTemplateBtn);

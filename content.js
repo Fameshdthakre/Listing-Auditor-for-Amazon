@@ -58,7 +58,7 @@
       return { found: true, error: "PAGE_NOT_FOUND_404", url: window.location.href, title: "Page Not Found" };
     }
 
-    const pageSource = document.documentElement.outerHTML;
+    // const pageSource = document.documentElement.outerHTML; // Optimization: Removed global extraction
     const scripts = document.querySelectorAll('script');
 
     // --- 3. Extract Attributes ---
@@ -68,7 +68,7 @@
     try {
         for (let script of scripts) {
             const content = script.textContent || "";
-            if (content.includes('jQuery.parseJSON') && (content.includes('colorToAsin') || content.includes('mediaAsin'))) {
+            if (content.length > 500 && content.includes('jQuery.parseJSON') && (content.includes('colorToAsin') || content.includes('mediaAsin'))) {
                 const match = content.match(/jQuery\.parseJSON\(\s*'([\s\S]*?)'\s*\)/);
                 if (match && match[1]) {
                     let jsonStr = match[1].replace(/\\'/g, "'").replace(/\\"/g, '"');
@@ -123,8 +123,9 @@
             });
         });
     } else {
+        // Fallback: search in innerHTML of specific containers if possible, or body
         const jsonRegex = /\[\s*\{"hiRes":.*?"variant":.*?\}\]/s;
-        const match = pageSource.match(jsonRegex);
+        const match = document.body.innerHTML.match(jsonRegex);
         const rawData = match ? JSON.parse(match[0]) : [];
         items = rawData.map(item => ({ variant: item.variant || "none", hiRes: cleanImageUrl(item.hiRes), large: cleanImageUrl(item.large) }));
     }
@@ -136,10 +137,21 @@
         metaTitle = goldMine.title || document.title;
         const txt = document.createElement("textarea"); txt.innerHTML = metaTitle; metaTitle = txt.value.replace(/\\/g, "");
     } else {
-        const mediaAsinMatch = pageSource.match(/"mediaAsin"\s*:\s*"([^"]+)"/);
-        mediaAsin = mediaAsinMatch ? mediaAsinMatch[1] : "none";
-        const parentAsinMatch = pageSource.match(/"parentAsin"\s*:\s*"([^"]+)"/);
-        parentAsin = parentAsinMatch ? parentAsinMatch[1] : "none";
+        const mediaAsinEl = document.querySelector('input[name="ASIN"], input[id="ASIN"]');
+        mediaAsin = mediaAsinEl ? mediaAsinEl.value : "none";
+
+        const parentAsinEl = document.querySelector('input[name="parentASIN"], input[id="parentASIN"]');
+        parentAsin = parentAsinEl ? parentAsinEl.value : "none";
+
+        if (mediaAsin === "none") {
+             const m = document.body.innerHTML.match(/"mediaAsin"\s*:\s*"([^"]+)"/);
+             if(m) mediaAsin = m[1];
+        }
+        if (parentAsin === "none") {
+             const m = document.body.innerHTML.match(/"parentAsin"\s*:\s*"([^"]+)"/);
+             if(m) parentAsin = m[1];
+        }
+
         const metaTitleEl = document.querySelector('meta[name="title"]');
         metaTitle = metaTitleEl ? metaTitleEl.getAttribute("content") : document.title;
     }
@@ -155,10 +167,10 @@
             if (goldMine.visualDimensions && goldMine.visualDimensions.length > 0) variationTheme = goldMine.visualDimensions.join(", ");
         }
     } else {
-        const dimMatch = pageSource.match(/"dimensions"\s*:\s*(\[[^\]]*\])/);
+        const dimMatch = document.body.innerHTML.match(/"dimensions"\s*:\s*(\[[^\]]*\])/);
         variationExists = dimMatch ? "YES" : "NO";
         variationTheme = dimMatch ? dimMatch[1] : "none";
-        const countMatch = pageSource.match(/"num_total_variations"\s*:\s*(\d+)/);
+        const countMatch = document.body.innerHTML.match(/"num_total_variations"\s*:\s*(\d+)/);
         variationCount = countMatch ? countMatch[1] : "none";
         for (let script of scripts) {
           if (script.textContent && script.textContent.includes('dimensionValuesDisplayData')) {
@@ -184,10 +196,20 @@
         }));
     } else {
         const videoSet = new Set();
+        // Optimization: Use DOM query first
+        const videoElements = document.querySelectorAll('div[data-role="video-player"]');
+        if(videoElements.length > 0) {
+             videoElements.forEach(el => {
+                 const json = el.getAttribute("data-video-url");
+                 if(json) videoSet.add(json);
+             });
+        }
+        // Fallback to regex on body HTML if needed, but safer
         const videoRegex = /"holderId"\s*:\s*"holder([^"]+)"/g;
         let vMatch;
-        while ((vMatch = videoRegex.exec(pageSource)) !== null) { videoSet.add(vMatch[1]); }
-        videos = Array.from(videoSet).map(id => ({ "video_url": `https://www.amazon.${domain}/vdp/${id}` }));
+        const bodyHTML = document.body.innerHTML;
+        while ((vMatch = videoRegex.exec(bodyHTML)) !== null) { videoSet.add(vMatch[1]); }
+        videos = Array.from(videoSet).map(id => ({ "video_url": id.startsWith('http') ? id : `https://www.amazon.${domain}/vdp/${id}` }));
     }
     const videoCount = videos.length;
     const hasVideo = videoCount > 0 ? "YES" : "NO";
@@ -214,13 +236,23 @@
     }
     if (brand === "none" || brand === "") {
         try {
-            const rhapsodyMatch = pageSource.match(/rhapsodyARIngressViewModel\s*=\s*\{[\s\S]*?brand\s*:\s*["']([^"']+)["']/);
+            const rhapsodyMatch = document.body.innerHTML.match(/rhapsodyARIngressViewModel\s*=\s*\{[\s\S]*?brand\s*:\s*["']([^"']+)["']/);
             if (rhapsodyMatch && rhapsodyMatch[1]) brand = rhapsodyMatch[1].trim();
         } catch (e) {}
     }
 
-    const priceMatch = pageSource.match(/"priceAmount"\s*:\s*([\d.]+)/);
-    const displayPrice = priceMatch ? priceMatch[1] : "none";
+    // Optimization: Check visible price elements first
+    const priceEl = document.querySelector('.a-price .a-offscreen') || document.querySelector('#priceblock_ourprice') || document.querySelector('#priceblock_dealprice');
+    let displayPrice = "none";
+    if (priceEl) {
+        const txt = priceEl.textContent.trim();
+        const num = txt.replace(/[^0-9.,]/g, '');
+        if (num) displayPrice = num;
+    }
+    if (displayPrice === "none") {
+        const priceMatch = document.body.innerHTML.match(/"priceAmount"\s*:\s*([\d.]+)/);
+        if (priceMatch) displayPrice = priceMatch[1];
+    }
 
     let stockStatus = "In Stock";
     const oosDiv = document.querySelector('div[id="outOfStockBuyBox_feature_div"]');

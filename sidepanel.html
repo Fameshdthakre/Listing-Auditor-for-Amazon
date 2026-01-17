@@ -322,9 +322,20 @@
 
     <div id="watchlistSection">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div class="bulk-hint" style="margin:0;">Your Golden Catalog</div>
+            <div class="bulk-hint" style="margin:0;">Watchlist Manager</div>
             <div id="watchlistLimitMsg" style="font-size:10px; color:var(--text-muted);">Limit: 10 (Free)</div>
-            <button id="clearWatchlistBtn" style="background:transparent; border:none; color:var(--danger); font-size:10px; text-decoration:underline; cursor:pointer; padding:0;">Clear All</button>
+        </div>
+
+        <div style="display:flex; gap:6px; margin-bottom:12px; align-items:center;">
+            <select id="watchlistSelect" style="flex:1;"></select>
+            <button id="newWatchlistBtn" title="Create New List" style="padding:6px; width:auto; flex:none;">➕</button>
+            <button id="renameWatchlistBtn" title="Rename List" style="padding:6px; width:auto; flex:none;">✏️</button>
+            <button id="deleteWatchlistBtn" title="Delete List" style="padding:6px; width:auto; flex:none; color:var(--danger);">🗑️</button>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+             <span style="font-size:11px; font-weight:600;">Items in List</span>
+             <button id="clearWatchlistBtn" style="background:transparent; border:none; color:var(--danger); font-size:10px; text-decoration:underline; cursor:pointer; padding:0;">Clear Items</button>
         </div>
         
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 10px; font-weight: 700; padding: 4px 8px; color: var(--text-muted); border-bottom: 1px solid var(--border);">
