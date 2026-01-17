@@ -330,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           chrome.storage.local.set({ [key]: container }, () => {
               loadWatchlist();
+              syncToFirestore(container); // Sync to Cloud
               if (mode === 'current') {
                   pasteStatus.textContent = `Saved to Watchlist!`;
                   pasteStatus.style.color = "var(--success)";
@@ -348,7 +349,10 @@ document.addEventListener('DOMContentLoaded', () => {
           let container = data[key];
           if(container && container[currentWatchlistId]) {
               container[currentWatchlistId].items = container[currentWatchlistId].items.filter(item => item.asin !== asin);
-              chrome.storage.local.set({ [key]: container }, loadWatchlist);
+              chrome.storage.local.set({ [key]: container }, () => {
+                  loadWatchlist();
+                  syncToFirestore(container);
+              });
           }
       });
   };
@@ -360,7 +364,10 @@ document.addEventListener('DOMContentLoaded', () => {
               let container = data[key];
               if(container && container[currentWatchlistId]) {
                   container[currentWatchlistId].items = [];
-                  chrome.storage.local.set({ [key]: container }, loadWatchlist);
+                  chrome.storage.local.set({ [key]: container }, () => {
+                      loadWatchlist();
+                      syncToFirestore(container);
+                  });
               }
           });
       }
@@ -406,7 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   </div>
                   <div style="text-align:right; font-size:14px; cursor:default;" title="${statusTitle}">
                       ${statusIcon}
-                      <span class="wl-del" title="Remove" style="margin-left:8px; cursor:pointer;">&times;</span>
+                      <span class="wl-chart" title="View History" style="margin-left:4px; cursor:pointer;">📈</span>
+                      <span class="wl-del" title="Remove" style="margin-left:4px; cursor:pointer;">&times;</span>
                   </div>
               </div>
           `;
@@ -414,6 +422,11 @@ document.addEventListener('DOMContentLoaded', () => {
           div.querySelector('.wl-del').addEventListener('click', (e) => {
               e.stopPropagation();
               removeFromWatchlist(item.asin);
+          });
+
+          div.querySelector('.wl-chart').addEventListener('click', (e) => {
+              e.stopPropagation();
+              showHistoryChart(item);
           });
           
           watchlistItemsDiv.appendChild(div);
@@ -787,6 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
       USER_INFO = session;
       chrome.storage.local.set({ userSession: session });
       updateUIForAuth();
+      fetchFromFirestore(); // Sync from Cloud on Login
   }
 
   logoutBtn.addEventListener('click', () => {
@@ -1875,3 +1889,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Insert download button in Watchlist section
   document.getElementById('watchlistSection').appendChild(downloadTemplateBtn);
+  // --- Feature: Visual Tracker (Chart.js) ---
+  const chartModal = document.getElementById('chartModal');
+  const closeChartBtn = document.getElementById('closeChartBtn');
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  let historyChart = null;
+
+  closeChartBtn.addEventListener('click', () => chartModal.close());
+
+  const showHistoryChart = (item) => {
+      if (!item.history || item.history.length < 2) {
+          alert("Not enough history data to show trends.");
+          return;
+      }
+
+      // Filter and format data
+      const dataPoints = item.history
+          .filter(h => h.price && h.price !== 'none')
+          .map(h => ({
+              x: new Date(h.date).toLocaleDateString(),
+              y: parseFloat(h.price.replace(/[^0-9.]/g, ''))
+          }));
+
+      if (dataPoints.length === 0) {
+          alert("No valid price history found.");
+          return;
+      }
+
+      if (historyChart) {
+          historyChart.destroy();
+      }
+
+      historyChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+              labels: dataPoints.map(d => d.x),
+              datasets: [{
+                  label: 'Price History (' + item.asin + ')',
+                  data: dataPoints.map(d => d.y),
+                  borderColor: '#2563eb',
+                  tension: 0.1
+              }]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                  y: {
+                      beginAtZero: false
+                  }
+              }
+          }
+      });
+
+      chartModal.showModal();
+  };
+  // --- Feature: Cloud Sync (Firestore) ---
+  import { doc, setDoc, getDoc } from './firebase/firebase-firestore.js';
+  import { GoogleAuthProvider, signInWithCredential } from './firebase/firebase-auth.js'; // Assuming auth is available
+
+  const syncToFirestore = async (container) => {
+      if (!IS_LOGGED_IN || !USER_INFO || !USER_INFO.email) return;
+
+      try {
+          // Use email as key since we don't have full Firebase Auth UID yet
+          // In production, signInWithCredential should be used to get true UID
+          const userKey = USER_INFO.email.replace(/[.]/g, '_');
+          const docRef = doc(db, "users", userKey);
+
+          await setDoc(docRef, { watchlists: container }, { merge: true });
+          console.log("Synced to Cloud");
+          statusDiv.textContent = "Synced to Cloud";
+          setTimeout(() => statusDiv.textContent = "Ready to scan.", 2000);
+      } catch (e) {
+          console.error("Sync Error", e);
+      }
+  };
+
+  const fetchFromFirestore = async () => {
+      if (!IS_LOGGED_IN || !USER_INFO || !USER_INFO.email) return;
+
+      try {
+          const userKey = USER_INFO.email.replace(/[.]/g, '_');
+          const docRef = doc(db, "users", userKey);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+              const data = docSnap.data();
+              if (data.watchlists) {
+                  // Merge strategy: Cloud wins for now to ensure consistency across devices
+                  const key = getWatchlistContainerKey();
+                  chrome.storage.local.set({ [key]: data.watchlists }, () => {
+                      loadWatchlist();
+                      console.log("Pulled from Cloud");
+                  });
+              }
+          }
+      } catch (e) {
+          console.error("Fetch Error", e);
+      }
+  };
