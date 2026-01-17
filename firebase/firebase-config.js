@@ -24,7 +24,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = null; // getAnalytics(app); // Disabled
 const db = getFirestore(app);
 
-export { app, analytics, db };
+export { app, db };

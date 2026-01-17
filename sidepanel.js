@@ -1,4 +1,4 @@
-import { app, analytics, db } from './firebase/firebase-config.js';
+import { app, db } from './firebase/firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
