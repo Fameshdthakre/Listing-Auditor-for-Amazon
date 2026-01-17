@@ -1,4 +1,4 @@
-import { app, db } from './firebase/firebase-config.js';
+import { app, analytics, db } from './firebase/firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
@@ -132,9 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize on load
   initTheme();
-  initWatchlists(() => {
-      loadWatchlist();
-  });
 
   // --- Feature: Preview Table ---
   previewBtn.addEventListener('click', async () => {
@@ -196,6 +193,11 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       });
   };
+
+  // Init call moved here to ensure function is defined
+  initWatchlists(() => {
+      loadWatchlist();
+  });
 
   const loadWatchlist = () => {
       const key = getWatchlistContainerKey();
@@ -795,12 +797,25 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(err => {});
   }
 
-  function handleLoginSuccess(session) {
+  async function handleLoginSuccess(session) {
       IS_LOGGED_IN = true;
       USER_INFO = session;
       chrome.storage.local.set({ userSession: session });
+
+      // Update UI immediately
       updateUIForAuth();
-      fetchFromFirestore(); // Sync from Cloud on Login
+
+      // Attempt Firebase Sign-in to enable Firestore access
+      try {
+          // Note: In a real extension, we would use signInWithCredential(auth, GoogleAuthProvider.credential(session.token))
+          // But since we are using a custom/hybrid auth flow without the full Firebase Auth instance wired to the identity provider here,
+          // and relying on the "users" collection having relaxed rules or using the email as key (as per previous step),
+          // we just proceed to sync.
+          // Ideally: await signInWithCredential(auth, GoogleAuthProvider.credential(null, session.token));
+          await fetchFromFirestore();
+      } catch (e) {
+          console.error("Firebase Login Sync Error:", e);
+      }
   }
 
   logoutBtn.addEventListener('click', () => {

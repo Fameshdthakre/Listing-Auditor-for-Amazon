@@ -1,4 +1,5 @@
 import { initializeApp } from './firebase-app.js';
+// import { getAnalytics } from './firebase-analytics.js'; // Disabled due to CSP
 import { getFirestore } from './firebase-firestore.js';
 
 // Your web app's Firebase configuration
@@ -23,6 +24,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const analytics = null; // getAnalytics(app); // Disabled
 const db = getFirestore(app);
 
-export { app, db };
+export { app, analytics, db };
