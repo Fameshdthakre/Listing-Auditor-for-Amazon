@@ -1,4 +1,6 @@
 import { app, db } from './firebase/firebase-config.js';
+  import { doc, setDoc, getDoc } from './firebase/firebase-firestore.js';
+  import { GoogleAuthProvider, signInWithCredential } from './firebase/firebase-auth.js'; // Assuming auth is available
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
@@ -229,32 +231,62 @@ document.addEventListener('DOMContentLoaded', () => {
       loadWatchlist();
   });
 
+  // --- Input Modal Logic ---
+  const inputModal = document.getElementById('inputModal');
+  const inputModalTitle = document.getElementById('inputModalTitle');
+  const closeInputModalBtn = document.getElementById('closeInputModalBtn');
+  const watchlistNameInput = document.getElementById('watchlistNameInput');
+  const saveInputBtn = document.getElementById('saveInputBtn');
+
+  let inputModalAction = null; // 'create' or 'rename'
+
+  closeInputModalBtn.addEventListener('click', () => inputModal.close());
+
   newWatchlistBtn.addEventListener('click', () => {
-      const name = prompt("Enter new watchlist name:");
-      if (name) {
-          const id = "wl_" + Date.now();
-          const key = getWatchlistContainerKey();
-          chrome.storage.local.get([key], (data) => {
-              const container = data[key] || {};
-              container[id] = { name: name, items: [], template: [] };
-              chrome.storage.local.set({ [key]: container }, () => {
-                  currentWatchlistId = id;
-                  // Trigger template selection for new list (Feature 2 stub)
-                  selectAttributesForTemplate(id);
-              });
-          });
-      }
+      inputModalTitle.textContent = "Create New Watchlist";
+      watchlistNameInput.value = "";
+      inputModalAction = 'create';
+      inputModal.showModal();
   });
 
   renameWatchlistBtn.addEventListener('click', () => {
+      // Need to fetch current name to pre-fill
       const key = getWatchlistContainerKey();
       chrome.storage.local.get([key], (data) => {
           const container = data[key];
           if (container && container[currentWatchlistId]) {
-              const newName = prompt("Rename watchlist:", container[currentWatchlistId].name);
-              if (newName) {
-                  container[currentWatchlistId].name = newName;
-                  chrome.storage.local.set({ [key]: container }, loadWatchlist);
+             inputModalTitle.textContent = "Rename Watchlist";
+             watchlistNameInput.value = container[currentWatchlistId].name;
+             inputModalAction = 'rename';
+             inputModal.showModal();
+          }
+      });
+  });
+
+  saveInputBtn.addEventListener('click', () => {
+      const name = watchlistNameInput.value.trim();
+      if (!name) { alert("Please enter a name."); return; }
+
+      const key = getWatchlistContainerKey();
+      chrome.storage.local.get([key], (data) => {
+          const container = data[key] || {};
+
+          if (inputModalAction === 'create') {
+              const id = "wl_" + Date.now();
+              container[id] = { name: name, items: [], template: [] };
+              chrome.storage.local.set({ [key]: container }, () => {
+                  currentWatchlistId = id;
+                  inputModal.close();
+                  // Open Template Selection
+                  selectAttributesForTemplate(id);
+              });
+          } else if (inputModalAction === 'rename') {
+              if (container[currentWatchlistId]) {
+                  container[currentWatchlistId].name = name;
+                  chrome.storage.local.set({ [key]: container }, () => {
+                      loadWatchlist();
+                      inputModal.close();
+                  });
               }
           }
       });
@@ -664,6 +696,7 @@ document.addEventListener('DOMContentLoaded', () => {
           clearBtn.style.background = "var(--surface)";
           clearConfirmMsg.style.display = "none";
           statusDiv.textContent = "Data cleared.";
+          progressCountDiv.style.display = 'none'; // Fix: Hide processed count
           fileStatus.textContent = "";
           pasteStatus.textContent = ""; 
           rawCsvData = []; 
@@ -804,6 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Update UI immediately
       updateUIForAuth();
+      statusDiv.textContent = "Logged in."; // Fix: Update status message
 
       // Attempt Firebase Sign-in to enable Firestore access
       try {
@@ -1783,71 +1817,100 @@ document.addEventListener('DOMContentLoaded', () => {
       copyBtn.textContent = 'Copied!';
       setTimeout(() => copyBtn.textContent = 'Copy JSON Data', 1500);
   });
-});
   // --- Feature 2: Attribute Templates ---
-  const selectAttributesForTemplate = (watchlistId) => {
-      // Show existing audit config panel but in "Template Mode"
-      const modal = document.createElement('dialog');
-      modal.style.padding = '0';
-      modal.style.border = 'none';
-      modal.style.borderRadius = '8px';
-      modal.style.width = '400px';
-      modal.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
 
-      const header = document.createElement('div');
-      header.className = 'modal-header';
-      header.innerHTML = '<span>Select Attributes to Track</span>';
+  const templateModal = document.getElementById('templateModal');
+  const closeTemplateModalBtn = document.getElementById('closeTemplateModalBtn');
+  const saveTemplateBtn = document.getElementById('saveTemplateBtn');
+  const tplSelectAll = document.getElementById('tplSelectAll');
 
-      const body = document.createElement('div');
-      body.className = 'modal-body';
-      body.style.padding = '12px';
-      body.style.maxHeight = '300px';
-      body.style.overflowY = 'auto';
+  closeTemplateModalBtn.addEventListener('click', () => templateModal.close());
 
-      // Clone existing grid but reset inputs
-      const grid = document.getElementById('attributesGrid').cloneNode(true);
-      grid.querySelectorAll('input').forEach(input => {
-          input.disabled = false;
-          input.checked = false; // Default off, let user pick
+  // Helper to handle template modal state
+  function updateTplGroupCheckboxes() {
+      ['core', 'advanced', 'content'].forEach(group => {
+          const groupCb = document.querySelector(`.tpl-group-select[data-group="${group}"]`);
+          const items = Array.from(document.querySelectorAll(`.tpl-attr-checkbox.tpl-group-${group}:not(:disabled)`));
+          if (items.length > 0 && groupCb) {
+              groupCb.checked = items.every(cb => cb.checked);
+          }
       });
-      // Default core attributes
-      ['mediaAsin', 'metaTitle', 'displayPrice'].forEach(val => {
-          const cb = grid.querySelector(`input[value="${val}"]`);
-          if(cb) cb.checked = true;
-      });
+      const all = Array.from(document.querySelectorAll('.tpl-attr-checkbox:not(:disabled)'));
+      tplSelectAll.checked = all.every(cb => cb.checked);
+  }
 
-      body.appendChild(grid);
+  // Bind events to Template Modal Checkboxes
+  tplSelectAll.addEventListener('change', (e) => {
+      document.querySelectorAll('.tpl-attr-checkbox:not(:disabled)').forEach(cb => cb.checked = e.target.checked);
+      updateTplGroupCheckboxes();
+  });
 
-      const footer = document.createElement('div');
-      footer.className = 'modal-footer';
-      const saveBtn = document.createElement('button');
-      saveBtn.textContent = 'Save Template';
-      saveBtn.className = 'auth-btn';
-      saveBtn.style.background = 'var(--primary)';
-      saveBtn.style.color = 'white';
-
-      saveBtn.onclick = () => {
-          const selected = Array.from(grid.querySelectorAll('input.attr-checkbox:checked')).map(cb => cb.value);
-          const key = getWatchlistContainerKey();
-          chrome.storage.local.get([key], (data) => {
-              const container = data[key];
-              if (container && container[watchlistId]) {
-                  container[watchlistId].template = selected;
-                  chrome.storage.local.set({ [key]: container }, () => {
-                      modal.close();
-                      alert("Template saved! Future imports/snapshots will highlight these attributes.");
-                  });
-              }
+  document.querySelectorAll('.tpl-group-select').forEach(groupCb => {
+      groupCb.addEventListener('change', (e) => {
+          const group = e.target.dataset.group;
+          const isChecked = e.target.checked;
+          document.querySelectorAll(`.tpl-attr-checkbox.tpl-group-${group}`).forEach(cb => {
+              if (!cb.disabled) cb.checked = isChecked;
           });
-      };
+          updateTplGroupCheckboxes();
+      });
+  });
 
-      footer.appendChild(saveBtn);
-      modal.appendChild(header);
-      modal.appendChild(body);
-      modal.appendChild(footer);
-      document.body.appendChild(modal);
-      modal.showModal();
-  };
+  document.querySelectorAll('.tpl-attr-checkbox').forEach(cb => {
+      cb.addEventListener('change', () => {
+          updateTplGroupCheckboxes();
+      });
+  });
+
+  function selectAttributesForTemplate(watchlistId) {
+      // 1. Reset all to uncheck first (but keep mandatory/disabled ones)
+      document.querySelectorAll('.tpl-attr-checkbox:not(:disabled)').forEach(cb => cb.checked = false);
+
+      // 2. Load existing template or default
+      const key = getWatchlistContainerKey();
+      chrome.storage.local.get([key], (data) => {
+          const container = data[key];
+          let selected = [];
+
+          if (container && container[watchlistId] && container[watchlistId].template && container[watchlistId].template.length > 0) {
+              selected = container[watchlistId].template;
+          } else {
+              // Default
+               selected = ['mediaAsin', 'metaTitle', 'displayPrice'];
+          }
+
+          // Apply selection
+          selected.forEach(val => {
+              const cb = document.querySelector(`.tpl-attr-checkbox[value="${val}"]`);
+              if (cb && !cb.disabled) cb.checked = true;
+          });
+
+          updateTplGroupCheckboxes();
+
+          // Store ID for save button context
+          saveTemplateBtn.dataset.watchlistId = watchlistId;
+
+          templateModal.showModal();
+      });
+  }
+
+  saveTemplateBtn.addEventListener('click', () => {
+      const watchlistId = saveTemplateBtn.dataset.watchlistId;
+      if (!watchlistId) return;
+
+      const selected = Array.from(document.querySelectorAll('.tpl-attr-checkbox:checked')).map(cb => cb.value);
+      const key = getWatchlistContainerKey();
+
+      chrome.storage.local.get([key], (data) => {
+          const container = data[key];
+          if (container && container[watchlistId]) {
+              container[watchlistId].template = selected;
+              chrome.storage.local.set({ [key]: container }, () => {
+                  templateModal.close();
+              });
+          }
+      });
+  });
 
   // Add "Edit Template" Button next to controls
   const editTemplateBtn = document.createElement('button');
@@ -1960,8 +2023,6 @@ document.addEventListener('DOMContentLoaded', () => {
       chartModal.showModal();
   };
   // --- Feature: Cloud Sync (Firestore) ---
-  import { doc, setDoc, getDoc } from './firebase/firebase-firestore.js';
-  import { GoogleAuthProvider, signInWithCredential } from './firebase/firebase-auth.js'; // Assuming auth is available
 
   const syncToFirestore = async (container) => {
       if (!IS_LOGGED_IN || !USER_INFO || !USER_INFO.email) return;
@@ -2004,3 +2065,4 @@ document.addEventListener('DOMContentLoaded', () => {
           console.error("Fetch Error", e);
       }
   };
+});

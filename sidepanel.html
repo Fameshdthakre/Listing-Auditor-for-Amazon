@@ -521,6 +521,105 @@
       </div>
   </dialog>
 
+  <dialog id="inputModal">
+      <div class="modal-header">
+          <span id="inputModalTitle">Watchlist Name</span>
+          <button id="closeInputModalBtn" style="flex:none; width:auto; background:transparent; border:none; color:var(--text-muted); font-size:20px; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+          <input type="text" id="watchlistNameInput" placeholder="Enter name..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+      </div>
+      <div class="modal-footer">
+          <button id="saveInputBtn" class="auth-btn" style="background:var(--primary); color:white; width:auto; display:inline-flex;">Save</button>
+      </div>
+  </dialog>
+
+  <dialog id="templateModal">
+      <div class="modal-header">
+          <span>Select Attributes to Track</span>
+          <button id="closeTemplateModalBtn" style="flex:none; width:auto; background:transparent; border:none; color:var(--text-muted); font-size:20px; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="options-header" style="border-top:none; background: var(--bg);">
+        <span>Configuration</span>
+        <label style="cursor:pointer; display:flex; align-items:center;">
+            <input type="checkbox" id="tplSelectAll" checked style="margin-right:4px;"> Select All
+        </label>
+      </div>
+
+      <div class="modal-body" style="padding: 0;">
+        <div id="tplAttributesGrid" class="attributes-grid" style="max-height: 400px;">
+             <div class="section-label">
+                <span>Executive Summary</span>
+                <span class="lock-icon">🔒</span>
+            </div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature" value="lqs" checked disabled> Listing Quality Score</label></div>
+            <div></div>
+
+            <div class="section-label">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" class="tpl-group-select" data-group="core" checked>
+                    <span>Core Data (Free)</span>
+                </div>
+            </div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="marketplace" checked disabled> Marketplace</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="queryASIN" checked disabled> Query ASIN</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="mediaAsin" checked disabled> Page ASIN</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="brand" checked> Brand Name</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="metaTitle" checked> Page Title</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="displayPrice" checked> Price</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="rating" checked> Rating (Stars)</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="reviews" checked> Review Count</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-core" value="url" checked disabled> Page URL</label></div>
+
+            <div class="section-label">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" class="tpl-group-select" data-group="advanced" checked disabled>
+                    <span>Advanced Data</span>
+                    <span class="lock-icon">🔒</span>
+                </div>
+            </div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="parentAsin" checked disabled> Parent ASIN</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="stockStatus" checked disabled> Stock Status</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="soldBy" checked disabled> Sold By</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="bsr" checked disabled> Best Sellers Rank</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="freeDeliveryDate" checked disabled> Free Delivery</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="paidDeliveryDate" checked disabled> Paid Delivery</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-advanced" value="primeOrFastestDeliveryDate" checked disabled> Prime / Fastest</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox tpl-group-advanced" value="deliveryLocation" checked disabled> Delivery Location</label></div>
+
+            <div class="section-label">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" class="tpl-group-select" data-group="content" checked disabled>
+                    <span>Content Audit</span>
+                    <span class="lock-icon">🔒</span>
+                </div>
+            </div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="hasBullets" checked disabled> Has Bullet Points?</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="bulletsCount" checked disabled> Bullet Count</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="bullets" checked disabled> Bullet Points</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="hasDescription" checked disabled> Has Description?</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="description" checked disabled> Description</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="variationExists" checked disabled> Has Variations?</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="variationTheme" checked disabled> Variation Theme</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="variationCount" checked disabled> Variation Quantity</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="variationFamily" checked disabled> Variation Child ASINs</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="hasBrandStory" checked disabled> Has Brand Story?</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="brandStoryImgs" checked disabled> Brand Story Links</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="hasAplus" checked disabled> Has A+ Content?</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="aPlusImgs" checked disabled> A+ Content Links</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="hasVideo" checked disabled> Has Video?</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="videoCount" checked disabled> Video Count</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="videos" checked disabled> Videos Links</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="imgVariantCount" checked disabled> Image Link Count</label></div>
+            <div class="checkbox-item"><label><input type="checkbox" class="tpl-attr-checkbox pro-feature tpl-group-content" value="imgVariantDetails" checked disabled> Image Link Details</label></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+          <button id="saveTemplateBtn" class="auth-btn" style="background:var(--primary); color:white; width:auto; display:inline-flex;">Save Template</button>
+      </div>
+  </dialog>
+
   <script src="chart.js"></script>
   <script src="xlsx.full.min.js"></script>
   <script type="module" src="sidepanel.js"></script>
