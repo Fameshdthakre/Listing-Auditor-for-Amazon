@@ -260,6 +260,7 @@
       <div class="mode-tab active" id="tabCurrent">Current Window</div>
       <div class="mode-tab disabled" id="tabBulk">Bulk Import <span class="lock-icon">🔒</span></div>
       <div class="mode-tab" id="tabWatchlist">Watchlist</div>
+      <div class="mode-tab disabled" id="tabVendor">Vendor <span class="lock-icon">🔒</span></div>
     </div>
     
     <div id="currentSection">
@@ -270,6 +271,10 @@
             <button id="snapshotBtn" style="flex:1; padding: 10px; font-size: 12px; background: rgba(254, 215, 170, 0.2); border: 1px solid #fed7aa; color: #c2410c; font-weight: 600; cursor: pointer; border-radius: 6px;">
                  📸 Snapshot
             </button>
+        </div>
+        <div style="margin-top:8px; display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="scrapeAODCurrent" style="accent-color:var(--primary);">
+            <label for="scrapeAODCurrent" style="font-size:12px; color:var(--text-main); font-weight:500;">Also Scrape Offers (AOD)</label>
         </div>
         <div id="pasteStatus" style="font-size:11px; text-align:center; margin-top:4px; font-weight:600; min-height:16px;"></div>
     </div>
@@ -316,8 +321,27 @@
                   <input type="checkbox" id="disableImages"> Disable Images (Faster)
               </label>
           </div>
+          <div class="control-row">
+              <label>Scrape AOD</label>
+              <label style="font-weight:400; cursor:pointer;">
+                  <input type="checkbox" id="scrapeAODBulk"> Get All Offers
+              </label>
+          </div>
       </div>
       <div id="fileStatus" style="font-size:11px; color:var(--success); margin-top:8px; font-weight:600;"></div>
+    </div>
+
+    <div id="vendorSection" style="display:none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+        <div class="bulk-hint">
+            Vendor Central Audit (Requires Login)
+        </div>
+        <div style="margin-bottom: 8px; font-size:11px; color:var(--text-muted);">
+            Upload CSV with headers: <strong>ASIN, SKU, VendorCode</strong>
+        </div>
+        <div class="file-input-wrapper" style="margin-bottom: 8px;">
+          <input type="file" id="vendorCsvInput" accept=".csv, .txt">
+        </div>
+        <div id="vendorFileStatus" style="font-size:11px; color:var(--success); margin-top:4px; font-weight:600;"></div>
     </div>
 
     <div id="watchlistSection">

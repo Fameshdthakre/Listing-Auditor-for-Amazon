@@ -21,10 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tabs & Sections
   const tabCurrent = document.getElementById('tabCurrent');
   const tabBulk = document.getElementById('tabBulk');
-  const tabWatchlist = document.getElementById('tabWatchlist'); 
+  const tabWatchlist = document.getElementById('tabWatchlist');
+  const tabVendor = document.getElementById('tabVendor');
   const bulkSection = document.getElementById('bulkSection');
   const currentSection = document.getElementById('currentSection'); 
-  const watchlistSection = document.getElementById('watchlistSection'); 
+  const watchlistSection = document.getElementById('watchlistSection');
+  const vendorSection = document.getElementById('vendorSection');
   
   const pasteLinksBtn = document.getElementById('pasteLinksBtn'); 
   const snapshotBtn = document.getElementById('snapshotBtn'); 
@@ -35,7 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const importWatchlistBtn = document.getElementById('importWatchlistBtn'); 
   const batchSizeInput = document.getElementById('batchSizeInput');
   const disableImagesInput = document.getElementById('disableImages');
+  const scrapeAODCurrent = document.getElementById('scrapeAODCurrent');
+  const scrapeAODBulk = document.getElementById('scrapeAODBulk');
   const fileStatus = document.getElementById('fileStatus');
+  const vendorFileStatus = document.getElementById('vendorFileStatus');
+  const vendorCsvInput = document.getElementById('vendorCsvInput');
   const progressContainer = document.getElementById('progressContainer');
   const progressBar = document.getElementById('progressBar');
   const domainSelect = document.getElementById('domainSelect');
@@ -880,7 +886,8 @@ document.addEventListener('DOMContentLoaded', () => {
           tabBulk.querySelector('.lock-icon').style.display = 'none';
           
           tabWatchlist.classList.remove('disabled');
-          // No lock icon query here
+          tabVendor.classList.remove('disabled');
+          tabVendor.querySelector('.lock-icon').style.display = 'none';
 
           document.querySelectorAll('.pro-feature').forEach(el => { el.disabled = false; el.checked = true; });
           document.querySelectorAll('.group-select').forEach(el => el.disabled = false);
@@ -891,13 +898,15 @@ document.addEventListener('DOMContentLoaded', () => {
           msBtn.style.display = 'flex';
           logoutBtn.style.display = 'none';
           
-          if (mode === 'bulk' && !document.getElementById('stopBtn').offsetParent) tabCurrent.click();
+          if ((mode === 'bulk' || mode === 'vendor') && !document.getElementById('stopBtn').offsetParent) tabCurrent.click();
           
           tabBulk.classList.add('disabled');
           tabBulk.querySelector('.lock-icon').style.display = 'inline';
           
           tabWatchlist.classList.remove('disabled');
-          // No lock icon query here
+
+          tabVendor.classList.add('disabled');
+          tabVendor.querySelector('.lock-icon').style.display = 'inline';
 
           document.querySelectorAll('.pro-feature').forEach(el => { el.checked = false; el.disabled = true; });
           document.querySelector('.group-select[data-group="advanced"]').disabled = true;
@@ -921,10 +930,12 @@ document.addEventListener('DOMContentLoaded', () => {
           currentSection.style.display = 'none';
           bulkSection.style.display = 'none';
           watchlistSection.style.display = 'none';
+          vendorSection.style.display = 'none';
           document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
           if(m === 'current') tabCurrent.classList.add('active'); 
           else if(m === 'bulk') tabBulk.classList.add('active'); 
           else if(m === 'watchlist') tabWatchlist.classList.add('active');
+          else if(m === 'vendor') tabVendor.classList.add('active');
       }
     }
   });
@@ -1009,8 +1020,10 @@ document.addEventListener('DOMContentLoaded', () => {
     tabCurrent.classList.add('active');
     tabBulk.classList.remove('active');
     tabWatchlist.classList.remove('active');
+    tabVendor.classList.remove('active');
     bulkSection.style.display = 'none';
     watchlistSection.style.display = 'none';
+    vendorSection.style.display = 'none';
     currentSection.style.display = 'block'; 
     scanBtn.textContent = 'Start Audit (Current Tabs)';
   });
@@ -1021,9 +1034,11 @@ document.addEventListener('DOMContentLoaded', () => {
     tabBulk.classList.add('active');
     tabCurrent.classList.remove('active');
     tabWatchlist.classList.remove('active');
+    tabVendor.classList.remove('active');
     bulkSection.style.display = 'block';
     currentSection.style.display = 'none'; 
     watchlistSection.style.display = 'none';
+    vendorSection.style.display = 'none';
     scanBtn.textContent = 'Start Bulk Audit';
   });
 
@@ -1032,10 +1047,26 @@ document.addEventListener('DOMContentLoaded', () => {
       tabWatchlist.classList.add('active');
       tabCurrent.classList.remove('active');
       tabBulk.classList.remove('active');
+      tabVendor.classList.remove('active');
       watchlistSection.style.display = 'block';
       bulkSection.style.display = 'none';
       currentSection.style.display = 'none'; 
+      vendorSection.style.display = 'none';
       loadWatchlist(); 
+  });
+
+  tabVendor.addEventListener('click', () => {
+      if (!IS_LOGGED_IN) { alert("Please Login."); return; }
+      mode = 'vendor';
+      tabVendor.classList.add('active');
+      tabCurrent.classList.remove('active');
+      tabBulk.classList.remove('active');
+      tabWatchlist.classList.remove('active');
+      vendorSection.style.display = 'block';
+      bulkSection.style.display = 'none';
+      currentSection.style.display = 'none';
+      watchlistSection.style.display = 'none';
+      scanBtn.textContent = 'Start Vendor Audit';
   });
 
   const handlePaste = async (limit, statusEl) => {
@@ -1061,51 +1092,87 @@ document.addEventListener('DOMContentLoaded', () => {
   pasteLinksBtn.addEventListener('click', () => handlePaste(GUEST_LIMIT, pasteStatus));
   pasteBtn.addEventListener('click', () => handlePaste(PRO_LIMIT, fileStatus));
 
-  csvInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      const text = event.target.result;
-      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-      if (lines.length === 0) return;
+  const handleFileSelect = (file, statusEl, modeType) => {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const text = event.target.result;
+          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+          if (lines.length === 0) return;
 
-      const firstLine = lines[0].toLowerCase();
-      if (firstLine.includes(',') && (firstLine.includes('url') || firstLine.includes('asin'))) {
-          const headers = csvLineParser(lines[0]).map(h => h.toLowerCase().replace(/['"]+/g, ''));
-          const urlIndex = headers.findIndex(h => h.includes('url') || h.includes('asin'));
-          const titleIndex = headers.findIndex(h => h.includes('expected title'));
-          const bulletIndex = headers.findIndex(h => h.includes('expected bullets'));
+          const firstLine = lines[0].toLowerCase();
 
-          if (urlIndex === -1) { fileStatus.textContent = "Error: Missing URL/ASIN column."; return; }
-
-          const structuredData = [];
-          for (let i = 1; i < lines.length; i++) {
-              const cols = csvLineParser(lines[i]);
-              if (cols[urlIndex]) {
-                  structuredData.push({
-                      url: cols[urlIndex].replace(/['"]+/g, ''),
-                      expected: {
-                          title: titleIndex !== -1 ? cols[titleIndex].replace(/['"]+/g, '') : null,
-                          bullets: bulletIndex !== -1 ? cols[bulletIndex].replace(/['"]+/g, '') : null
-                      }
-                  });
+          if (modeType === 'vendor') {
+              if (!firstLine.includes('asin') || !firstLine.includes('sku') || !firstLine.includes('vendorcode')) {
+                  statusEl.textContent = "Error: Headers must match ASIN, SKU, VendorCode";
+                  statusEl.style.color = "var(--danger)";
+                  return;
               }
+              const headers = csvLineParser(lines[0]).map(h => h.toLowerCase().replace(/['"]+/g, ''));
+              const asinIdx = headers.findIndex(h => h === 'asin');
+              const skuIdx = headers.findIndex(h => h === 'sku');
+              const vendorIdx = headers.findIndex(h => h === 'vendorcode');
+
+              const structuredData = [];
+              for (let i = 1; i < lines.length; i++) {
+                  const cols = csvLineParser(lines[i]);
+                  if (cols[asinIdx] && cols[skuIdx] && cols[vendorIdx]) {
+                      structuredData.push({
+                          asin: cols[asinIdx].replace(/['"]+/g, ''),
+                          sku: cols[skuIdx].replace(/['"]+/g, ''),
+                          vendorCode: cols[vendorIdx].replace(/['"]+/g, '')
+                      });
+                  }
+              }
+              rawCsvData = structuredData;
+              statusEl.textContent = `Loaded ${structuredData.length} VC rows.`;
+              statusEl.style.color = "var(--success)";
+
+          } else {
+              // Regular Bulk Mode
+              if (firstLine.includes(',') && (firstLine.includes('url') || firstLine.includes('asin'))) {
+                  const headers = csvLineParser(lines[0]).map(h => h.toLowerCase().replace(/['"]+/g, ''));
+                  const urlIndex = headers.findIndex(h => h.includes('url') || h.includes('asin'));
+                  const titleIndex = headers.findIndex(h => h.includes('expected title'));
+                  const bulletIndex = headers.findIndex(h => h.includes('expected bullets'));
+
+                  if (urlIndex === -1) { statusEl.textContent = "Error: Missing URL/ASIN column."; return; }
+
+                  const structuredData = [];
+                  for (let i = 1; i < lines.length; i++) {
+                      const cols = csvLineParser(lines[i]);
+                      if (cols[urlIndex]) {
+                          structuredData.push({
+                              url: cols[urlIndex].replace(/['"]+/g, ''),
+                              expected: {
+                                  title: titleIndex !== -1 ? cols[titleIndex].replace(/['"]+/g, '') : null,
+                                  bullets: bulletIndex !== -1 ? cols[bulletIndex].replace(/['"]+/g, '') : null
+                              }
+                          });
+                      }
+                  }
+                  rawCsvData = structuredData;
+                  statusEl.textContent = `Loaded ${structuredData.length} structured rows.`;
+              } else {
+                  rawCsvData = lines.map(line => line.trim());
+                  statusEl.textContent = `Loaded ${lines.length} lines.`;
+              }
+              statusEl.style.color = "var(--success)";
           }
-          rawCsvData = structuredData;
-          fileStatus.textContent = `Loaded ${structuredData.length} structured rows.`;
-      } else {
-          rawCsvData = lines.map(line => line.trim());
-          fileStatus.textContent = `Loaded ${lines.length} lines.`;
-      }
-      fileStatus.style.color = "var(--success)";
-    };
-    reader.readAsText(file);
-  });
+      };
+      reader.readAsText(file);
+  };
+
+  csvInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], fileStatus, 'bulk'));
+  vendorCsvInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], vendorFileStatus, 'vendor'));
 
   scanBtn.addEventListener('click', async () => {
     let urlsToProcess = [];
-    if (mode === 'current') {
+
+    if (mode === 'vendor') {
+        if (!IS_LOGGED_IN) { alert("Login required."); return; }
+        if (rawCsvData.length === 0) { alert("No Data Loaded."); return; }
+        urlsToProcess = rawCsvData; // Pass raw objects {asin, sku, vendorCode}
+    } else if (mode === 'current') {
        if (rawCsvData.length > 0) {
            let validUrls = rawCsvData.map(line => buildOrNormalizeUrl(line)).filter(u => u !== null);
            urlsToProcess = validUrls;
@@ -1128,7 +1195,10 @@ document.addEventListener('DOMContentLoaded', () => {
        if(urlsToProcess.length === 0) { alert("No valid URLs."); return; }
     }
 
-    const settings = { disableImages: (mode === 'bulk' && disableImagesInput.checked) };
+    const settings = {
+        disableImages: (mode !== 'current' && disableImagesInput.checked),
+        scrapeAOD: (mode === 'current' ? scrapeAODCurrent.checked : (mode === 'bulk' ? scrapeAODBulk.checked : false))
+    };
     chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode, settings } });
   });
 
@@ -1167,7 +1237,8 @@ document.addEventListener('DOMContentLoaded', () => {
           
           if(currentSection) currentSection.style.display = 'none';
           if(bulkSection) bulkSection.style.display = 'none';
-          if(watchlistSection) watchlistSection.style.display = 'none'; 
+          if(watchlistSection) watchlistSection.style.display = 'none';
+          if(vendorSection) vendorSection.style.display = 'none';
       } else {
           scanBtn.style.display = 'block';
           stopBtn.style.display = 'none';
@@ -1204,6 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
               if (mode === 'current') { if(currentSection) currentSection.style.display = 'block'; }
               else if (mode === 'bulk') { if(bulkSection) bulkSection.style.display = 'block'; }
               else if (mode === 'watchlist') { if(watchlistSection) watchlistSection.style.display = 'block'; }
+              else if (mode === 'vendor') { if(vendorSection) vendorSection.style.display = 'block'; }
           }
       }
       
@@ -1381,6 +1453,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (selectedFields.includes('videos')) tabMap.videos = createTab('videos', ['pageASIN']);
     if (selectedFields.includes('imgVariantDetails')) tabMap.imgVariantDetails = createTab('imgVariantDetails', ['pageASIN', 'variant', 'hiRes', 'large']);
 
+    // Always create Offers tab if data exists, or conditionally? Let's check results first.
+    // If ANY result has aodData, we create the Offers tab.
+    const hasAOD = results.some(r => r.attributes && r.attributes.aodData && r.attributes.aodData.length > 0);
+    if (hasAOD) tabMap.offers = createTab('offers', ['pageASIN', 'seller', 'price', 'ships_from', 'rating', 'reviews']);
+
     const rows = results.map(tabData => {
         let rowStatus = "SUCCESS";
         if (tabData.error) {
@@ -1493,6 +1570,45 @@ document.addEventListener('DOMContentLoaded', () => {
                             cleanAmazonUrl(d.large)
                         ]);
                     });
+                }
+            }
+            if (tabMap.offers && tabData.attributes.aodData) {
+                tabData.attributes.aodData.forEach(offer => {
+                    tabMap.offers.rows.push([
+                        pageASIN,
+                        offer.soldBy || 'unknown',
+                        offer.price || 'none',
+                        offer.shipsFrom || 'none',
+                        offer.rating || 'none',
+                        offer.reviews || 'none'
+                    ]);
+                });
+            }
+        }
+
+        // --- Vendor Central Specific Logic ---
+        if (tabData.vcData) {
+            // Inject VC specific columns or override
+            // For now, let's just ensure we output the identifying info if it was a VC scan
+            // Since we use MASTER_COLUMNS, we might need to add specific VC columns there later.
+            // But user asked for specific attributes extraction.
+            // Let's add them to the row object if they exist in the result.
+            // Assuming 'result' structure for VC scan: { isVC: true, item_name, ... }
+            // Wait, result structure from background for VC is passed as `tabData`.
+            // But `extractSingleTab` returns `res` which is from content.js `scrapeVendorCentral`.
+
+            // Check if this result IS a VC result (structure differs from Amazon PDP)
+            if (tabData.isVC) {
+                // Map VC fields to standard columns or add new ones to export
+                row['item_name'] = tabData.item_name;
+                row['product_description'] = tabData.product_description;
+                row['list_price'] = tabData.list_price;
+                if (tabData.bullet_points) row['bullet_point'] = tabData.bullet_points.join(' | ');
+
+                // Images
+                if (tabData.images) {
+                    row['product_image_count'] = tabData.images.length;
+                    row['product_image_details'] = JSON.stringify(tabData.images);
                 }
             }
         }

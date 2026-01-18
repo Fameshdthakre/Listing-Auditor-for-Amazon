@@ -253,7 +253,16 @@ async function processQueue(state) {
         for (let i = 0; i < toOpen; i++) {
             const itemIndex = state.queueIndex + i;
             const item = state.urlsToProcess[itemIndex];
-            const url = item.url || item;
+
+            let url = item.url || item;
+            let isVC = false;
+
+            // Vendor Central URL Construction
+            if (state.mode === 'vendor' && item.asin && item.sku && item.vendorCode) {
+                isVC = true;
+                // Default to Catalog Edit as it's the primary audit target.
+                url = `https://vendorcentral.amazon.com/abis/listing/edit?sku=${item.sku}&asin=${item.asin}&vendorCode=${item.vendorCode}`;
+            }
 
             try {
                 const createProps = { url: url, active: false };
@@ -263,6 +272,7 @@ async function processQueue(state) {
                 state.activeTabs[tab.id] = {
                     url: url,
                     item: item,
+                    isVC: isVC,
                     startTime: Date.now(),
                     status: 'loading'
                 };
@@ -285,14 +295,32 @@ async function processQueue(state) {
 async function extractSingleTab(state, tabId, tabInfo) {
     try {
         const originalUrl = tabInfo.url;
+
+        // --- AOD (All Offers Display) Scrape Trigger ---
+        if (state.settings && state.settings.scrapeAOD && !tabInfo.isVC) {
+            // Inject flag to tell content.js to scrape AOD
+            await chrome.scripting.executeScript({
+                target: { tabId: parseInt(tabId) },
+                func: () => { window.SHOULD_SCRAPE_AOD = true; }
+            });
+        }
+
         const res = await extractFromTab(parseInt(tabId));
 
         if (res) {
             if (res.error === "CAPTCHA_DETECTED") return res; // Pass error up
 
-            res.queryASIN = getAsinFromUrl(originalUrl);
-            const item = tabInfo.item;
-            if (item.expected) res.expected = item.expected;
+            // VC Handling: Merge Data if it's a VC scan
+            if (tabInfo.isVC) {
+                if (tabInfo.item && tabInfo.item.asin) {
+                    res.vcData = tabInfo.item; // {asin, sku, vendorCode}
+                }
+            } else {
+                res.queryASIN = getAsinFromUrl(originalUrl);
+                const item = tabInfo.item;
+                if (item.expected) res.expected = item.expected;
+            }
+
             if (res.error && !res.url) res.url = originalUrl;
             return res;
         }

@@ -8,6 +8,77 @@
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // --- Vendor Central Scraper Function ---
+    const scrapeVendorCentral = async () => {
+        const url = window.location.href;
+        const result = { isVC: true, url };
+
+        try {
+            // 1. Image Manage Page
+            if (url.includes("/imaging/manage")) {
+                result.type = "images";
+                result.images = [];
+
+                // Selector: div[class*="imageGroup clearfix"]:eq(0) > div
+                // In JS: document.querySelectorAll('.imageGroup.clearfix')[0].querySelectorAll('div')
+
+                const group = document.querySelector('div[class*="imageGroup"]'); // first one
+                if (group) {
+                    const containers = group.children; // direct divs
+                    for (let div of containers) {
+                        // "div:eq(0) > img" -> div.querySelector('div > img') or just first img inside?
+                        // "div:eq(0)" usually means first child.
+                        // The structure is likely: Container > Wrapper > Img.
+                        // Let's look for the first IMG in this container.
+                        const img = div.querySelector('img');
+                        if (img) {
+                            result.images.push({
+                                variant: img.alt || "none", // Variant Name (Alt)
+                                src: img.src || "none"      // Image Link
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 2. Catalog Edit Page
+            else if (url.includes("/abis/listing/edit")) {
+                result.type = "catalog";
+
+                const getValue = (selector) => {
+                    const el = document.querySelector(selector);
+                    if (!el) return "none";
+                    // Check standard value, then attribute, then shadow root if needed
+                    if (el.value) return el.value;
+                    if (el.getAttribute('value')) return el.getAttribute('value');
+                    return "none";
+                };
+
+                // Item Name
+                result.item_name = getValue('kat-textarea[name="item_name-0-value"]');
+
+                // Description
+                result.product_description = getValue('kat-textarea[name="rtip_product_description-0-value"]');
+
+                // List Price
+                result.list_price = getValue('kat-input[name="list_price-0-value"]');
+
+                // Bullet Points (All found)
+                result.bullet_points = [];
+                const bullets = document.querySelectorAll('kat-textarea[name*="bullet_point"]');
+                bullets.forEach(b => {
+                    const val = b.value || b.getAttribute('value');
+                    if (val) result.bullet_points.push(val);
+                });
+            }
+
+            return result;
+
+        } catch (e) {
+            return { error: e.toString() };
+        }
+    };
+
     const extractJsonArray = (str, startSearchIndex) => {
         const openBracketIndex = str.indexOf('[', startSearchIndex);
         if (openBracketIndex === -1) return null;
@@ -22,6 +93,94 @@
         }
         return endIndex !== -1 ? str.substring(openBracketIndex, endIndex) : null;
     };
+
+    // --- AOD Scraper Function ---
+    const scrapeAOD = async () => {
+        try {
+            // 1. Open AOD
+            const ingressBtn = document.querySelector('span[data-action="show-all-offers-display"] > a[id="aod-ingress-link"]');
+            if (ingressBtn) {
+                ingressBtn.click();
+                await sleep(2000);
+            } else {
+                // If button not found, we might need to navigate, but let's assume we are on the page or it opened.
+                // If strictly required, background logic should handle navigation to /gp/offer-listing/
+            }
+
+            // 2. Wait for Container
+            let container = document.getElementById('all-offers-display-scroller');
+            let attempts = 0;
+            while (!container && attempts < 10) {
+                await sleep(500);
+                container = document.getElementById('all-offers-display-scroller');
+                attempts++;
+            }
+            if (!container) return [];
+
+            // 3. Scroll to Load All
+            let lastHeight = container.scrollHeight;
+            let noChangeCount = 0;
+            while (noChangeCount < 3) {
+                container.scrollTop = container.scrollHeight;
+                await sleep(1500);
+                let newHeight = container.scrollHeight;
+                if (newHeight === lastHeight) {
+                    noChangeCount++;
+                } else {
+                    noChangeCount = 0;
+                    lastHeight = newHeight;
+                }
+            }
+
+            // 4. Extract Offers
+            const offers = [];
+            const offerCards = document.querySelectorAll('div[id="aod-offer-list"] > div');
+
+            offerCards.forEach(card => {
+                try {
+                    const priceEl = card.querySelector('span.a-price .a-offscreen');
+                    const price = priceEl ? priceEl.textContent.trim() : "none";
+
+                    const shipsFromEl = card.querySelector('div[id="aod-offer-shipsFrom"] .a-col-right .a-size-small');
+                    const shipsFrom = shipsFromEl ? shipsFromEl.textContent.trim() : "none";
+
+                    const soldByEl = card.querySelector('div[id="aod-offer-soldBy"] .a-col-right .a-size-small');
+                    const soldBy = soldByEl ? soldByEl.textContent.trim() : "none";
+
+                    // Rating & Reviews (Regex Cleaning)
+                    let rating = "none";
+                    let reviews = "none";
+
+                    const sellerRatingContainer = card.querySelector('div[id="aod-offer-seller-rating"]');
+                    if (sellerRatingContainer) {
+                        const content = sellerRatingContainer.textContent || "";
+                        // Rating: matches (4.5 stars) -> 4.5
+                        const ratingMatch = content.match(/\(([\d.]+)\s*stars?\)/i) || content.match(/^([\d.]+)\s*out/);
+                        if (ratingMatch) rating = ratingMatch[1];
+
+                        // Reviews: matches (123 ratings) -> 123
+                        const reviewMatch = content.match(/\(([\d,]+)\s*ratings?\)/i);
+                        if (reviewMatch) reviews = reviewMatch[1].replace(/,/g, '');
+                    }
+
+                    if (price !== "none") {
+                        offers.push({ price, shipsFrom, soldBy, rating, reviews });
+                    }
+                } catch(e) {}
+            });
+
+            return offers;
+
+        } catch (e) {
+            console.error("AOD Scraping Error", e);
+            return [];
+        }
+    };
+
+    // --- 1. Determine Mode (VC or Amazon) ---
+    if (window.location.hostname.includes("vendorcentral.amazon")) {
+        return await scrapeVendorCentral();
+    }
 
     // --- 1.5. Alert/Interstitial Page Handling (Unattended Mode) ---
     const alertElement = document.querySelector('html.a-no-js');
@@ -94,6 +253,21 @@
     };
 
     await waitForReady();
+
+    // --- 2.7. Check for AOD Mode request ---
+    // If background requested AOD scrape specifically via a flag in URL or if we decide here.
+    // Ideally, `extractFromTab` calls this script.
+    // We can check a global var if we injected one, or just do it.
+    // For now, let's look for a specific signal or just return a function to be called?
+    // Chrome scripting executeScript returns the last value.
+    // If we want to support AOD optionally, we need to know if we should run it.
+    // Hack: We can check window.name or just do it if the container exists?
+    // Better: Background injects a variable `window.SHOULD_SCRAPE_AOD = true` before file.
+
+    let aodData = [];
+    if (window.SHOULD_SCRAPE_AOD) {
+        aodData = await scrapeAOD();
+    }
 
     // --- 3. Extract Attributes (Lazy) ---
     // If we only need core data, we can skip heavy image parsing.
@@ -476,7 +650,8 @@
         brandStoryImgs, aPlusImgs, videos,
         hasAplus, hasBrandStory, hasVideo, hasBullets, hasDescription,
         lqs, lqsDetails: breakdown, // NEW: Export breakdown
-        videoCount, deliveryLocation
+        videoCount, deliveryLocation,
+        aodData // NEW: AOD Offers
       },
       data: items
     };
