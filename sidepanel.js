@@ -1244,42 +1244,42 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Export Helpers ---
   const MASTER_COLUMNS = [
     { key: 'status', header: 'status' },
-    { key: 'marketplace', header: 'marketPlace' },
-    { key: 'deliveryLocation', header: 'deliveryLocation' },
-    { key: 'url', header: 'pageURL' },
-    { key: 'queryASIN', header: 'queryASIN' },
-    { key: 'mediaAsin', header: 'pageASIN' },
-    { key: 'parentAsin', header: 'parentAsin' },
-    { key: 'lqs', header: 'lqs' },
-    { key: 'displayPrice', header: 'displayPrice' },
-    { key: 'stockStatus', header: 'stockStatus' },
-    { key: 'freeDeliveryDate', header: 'freeDeliveryDate' },
-    { key: 'paidDeliveryDate', header: 'paidDeliveryDate' },
-    { key: 'primeOrFastestDeliveryDate', header: 'primeOrFastestDeliveryDate' },
-    { key: 'soldBy', header: 'soldBy' },
+    { key: 'marketplace', header: 'marketplace' },
+    { key: 'deliveryLocation', header: 'delivery_location' },
+    { key: 'url', header: 'page_url' },
+    { key: 'queryASIN', header: 'query_asin' },
+    { key: 'mediaAsin', header: 'page_asin' },
+    { key: 'parentAsin', header: 'parent_asin' },
+    { key: 'lqs', header: 'listing_quality_score' },
+    { key: 'displayPrice', header: 'list_price' },
+    { key: 'stockStatus', header: 'stock_status' },
+    { key: 'freeDeliveryDate', header: 'free_delivery_date' },
+    { key: 'paidDeliveryDate', header: 'paid_delivery_date' },
+    { key: 'primeOrFastestDeliveryDate', header: 'prime_fastest_delivery_date' },
+    { key: 'soldBy', header: 'sold_by' },
     { key: 'rating', header: 'rating' },
     { key: 'reviews', header: 'reviews' },
-    { key: 'bsr', header: 'bestSellersRank' },
+    { key: 'bsr', header: 'best_sellers_rank' },
     { key: 'brand', header: 'brand' },
-    { key: 'metaTitle', header: 'metaTitle' },
-    { key: 'hasBullets', header: 'hasBullets' },
-    { key: 'bulletsCount', header: 'bulletsCount' },
-    { key: 'bullets', header: 'bullets' },
-    { key: 'hasDescription', header: 'hasDescription' },
-    { key: 'description', header: 'description' },
-    { key: 'variationExists', header: 'variationExists' },
-    { key: 'variationTheme', header: 'variationTheme' },
-    { key: 'variationCount', header: 'variationCount' },
-    { key: 'variationFamily', header: 'variationFamily' },
-    { key: 'hasBrandStory', header: 'hasBrandStory' },
-    { key: 'brandStoryImgs', header: 'brandStoryImgs' },
-    { key: 'hasAplus', header: 'hasAplus' },
-    { key: 'aPlusImgs', header: 'aPlusImgs' },
-    { key: 'hasVideo', header: 'hasVideo' },
-    { key: 'videoCount', header: 'videoCount' },
+    { key: 'metaTitle', header: 'item_name' },
+    { key: 'hasBullets', header: 'has_bullet_point' },
+    { key: 'bulletsCount', header: 'bullet_point_count' },
+    { key: 'bullets', header: 'bullet_point' },
+    { key: 'hasDescription', header: 'has_product_description' },
+    { key: 'description', header: 'product_description' },
+    { key: 'variationExists', header: 'has_variation' },
+    { key: 'variationTheme', header: 'variation_theme' },
+    { key: 'variationCount', header: 'variation_family_count' },
+    { key: 'variationFamily', header: 'variation_family' },
+    { key: 'hasBrandStory', header: 'has_brand_story' },
+    { key: 'brandStoryImgs', header: 'brand_story_images' },
+    { key: 'hasAplus', header: 'has_aplus_modules' },
+    { key: 'aPlusImgs', header: 'aplus_image_modules' },
+    { key: 'hasVideo', header: 'has_video' },
+    { key: 'videoCount', header: 'videos_count' },
     { key: 'videos', header: 'videos' },
-    { key: 'imgVariantCount', header: 'imgVariantCount' },
-    { key: 'imgVariantDetails', header: 'imgVariantDetails' }
+    { key: 'imgVariantCount', header: 'product_image_count' },
+    { key: 'imgVariantDetails', header: 'product_image_details' }
   ];
 
   const forcedFields = ['marketplace', 'deliveryLocation', 'mediaAsin', 'url', 'queryASIN'];
@@ -1810,13 +1810,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateGroupCheckboxes();
   });
   
-  copyBtn.addEventListener('click', async () => {
-      const data = await chrome.storage.local.get('auditState');
-      const results = data.auditState ? data.auditState.results : [];
-      navigator.clipboard.writeText(JSON.stringify(results, null, 2));
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => copyBtn.textContent = 'Copy JSON Data', 1500);
-  });
   // --- Feature 2: Attribute Templates ---
 
   const templateModal = document.getElementById('templateModal');
