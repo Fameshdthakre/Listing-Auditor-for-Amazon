@@ -17,6 +17,16 @@ const INITIAL_STATE = {
 
 const CONCURRENCY_LIMIT = 5;
 
+// --- Initialization ---
+
+chrome.runtime.onInstalled.addListener(() => {
+  // Ensure the side panel opens when the extension icon is clicked
+  if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+          .catch((error) => console.error("SidePanel Error:", error));
+  }
+});
+
 // --- Event Listeners ---
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
