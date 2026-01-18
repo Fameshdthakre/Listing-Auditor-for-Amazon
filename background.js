@@ -254,13 +254,15 @@ async function processQueue(state) {
             const itemIndex = state.queueIndex + i;
             const item = state.urlsToProcess[itemIndex];
 
-            let url = item.url || item;
+            // Handle both simple strings and task objects
+            let url = (typeof item === 'string') ? item : (item.url || item);
             let isVC = false;
 
-            // Vendor Central URL Construction
-            if (state.mode === 'vendor' && item.asin && item.sku && item.vendorCode) {
+            // Explicit Task Object Logic (Type 2 Audit)
+            if (item.type === 'vc') isVC = true;
+            // Legacy Vendor Logic (CSV with SKU/VendorCode)
+            else if (state.mode === 'vendor' && item.asin && item.sku && item.vendorCode) {
                 isVC = true;
-                // Default to Catalog Edit as it's the primary audit target.
                 url = `https://vendorcentral.amazon.com/abis/listing/edit?sku=${item.sku}&asin=${item.asin}&vendorCode=${item.vendorCode}`;
             }
 
@@ -310,10 +312,16 @@ async function extractSingleTab(state, tabId, tabInfo) {
         if (res) {
             if (res.error === "CAPTCHA_DETECTED") return res; // Pass error up
 
-            // VC Handling: Merge Data if it's a VC scan
+            // Attach Comparison/Task Data to Result
+            res.isVC = tabInfo.isVC;
+            res.comparisonData = tabInfo.item.comparisonData;
+            res.id = tabInfo.item.id; // ASIN link for merging
+
+            // VC Handling: Legacy vs New
             if (tabInfo.isVC) {
-                if (tabInfo.item && tabInfo.item.asin) {
-                    res.vcData = tabInfo.item; // {asin, sku, vendorCode}
+                if (tabInfo.item && tabInfo.item.asin && !tabInfo.item.id) {
+                    // Legacy Vendor CSV
+                    res.vcData = tabInfo.item;
                 }
             } else {
                 res.queryASIN = getAsinFromUrl(originalUrl);
