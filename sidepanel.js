@@ -1202,6 +1202,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return structuredData;
   };
 
+  const getVendorCentralDomain = (marketplace) => {
+      const na = ['Amazon.com', 'Amazon.ca'];
+      const eu = ['Amazon.co.uk', 'Amazon.de', 'Amazon.fr', 'Amazon.it', 'Amazon.es', 'Amazon.nl', 'Amazon.se', 'Amazon.com.be', 'Amazon.pl'];
+      const au = ['Amazon.com.au'];
+
+      if (na.includes(marketplace)) return 'vendorcentral.amazon.com';
+      if (eu.includes(marketplace)) return 'vendorcentral.amazon.co.uk';
+      if (au.includes(marketplace)) return 'vendorcentral.amazon.com.au';
+
+      return 'vendorcentral.amazon.com'; // Default
+  };
+
   const handleFileSelect = (file, statusEl, modeType) => {
       const reader = new FileReader();
       reader.onload = function(event) {
@@ -1303,7 +1315,8 @@ document.addEventListener('DOMContentLoaded', () => {
                  const asin = d.url.match(/([A-Z0-9]{10})/)?.[1];
                  if (!asin) return null;
                  const pdpUrl = buildOrNormalizeUrl(d.url);
-                 const vcUrl = `https://vendorcentral.amazon.com/imaging/manage?asins=${asin}`;
+                 const vcDomain = getVendorCentralDomain(domainSelect.value);
+                 const vcUrl = `https://${vcDomain}/imaging/manage?asins=${asin}`;
 
                  return [
                      { url: pdpUrl, type: 'pdp', id: asin, comparisonData: d.comparisonData },
@@ -1337,7 +1350,8 @@ document.addEventListener('DOMContentLoaded', () => {
                    const url = buildOrNormalizeUrl(item.url);
                    const asin = url ? url.match(/([A-Z0-9]{10})/)?.[1] : null;
                    if (asin) {
-                       const vcUrl = `https://vendorcentral.amazon.com/imaging/manage?asins=${asin}`;
+                       const vcDomain = getVendorCentralDomain(domainSelect.value);
+                       const vcUrl = `https://${vcDomain}/imaging/manage?asins=${asin}`;
                        return [
                            { url: url, type: 'pdp', id: asin, comparisonData: item.comparisonData },
                            { url: vcUrl, type: 'vc', id: asin }
