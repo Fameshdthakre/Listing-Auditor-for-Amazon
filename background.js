@@ -212,124 +212,181 @@ function getAsinFromUrl(url) {
 async function processQueue(state) {
     if (!state.isScanning) return;
 
-    // 1. Check for Completed Tabs (Extraction)
-    // We check active tabs to see if they've been open long enough to be ready for extraction
-    const now = Date.now();
-    const activeTabIds = Object.keys(state.activeTabs || {});
+    try {
+        // 1. Check for Completed Tabs (Extraction)
+        // We check active tabs to see if they've been open long enough to be ready for extraction
+        const now = Date.now();
+        let activeTabIds = Object.keys(state.activeTabs || {});
 
-    // Process existing tabs
-    for (const tabId of activeTabIds) {
-        const tabInfo = state.activeTabs[tabId];
-        // If tab is extracting, skip
-        if (tabInfo.status === 'extracting') continue;
+        // --- Zombie Cleanup: Ensure all tracked tabs actually exist ---
+        let realTabs = [];
+        try {
+            if (state.workerWindowId) {
+               realTabs = await chrome.tabs.query({ windowId: state.workerWindowId });
+            }
+        } catch(e) {} // Window might be gone, handled below
 
-        // Check readiness: Either onUpdated fired (loaded=true) OR timeout (10s) passed
-        // This removes the arbitrary 2s wait for fast pages
-        const isReady = tabInfo.loaded || (now - tabInfo.startTime > 10000);
+        const realTabIds = new Set(realTabs.map(t => t.id));
 
-        if (tabInfo.status === 'loading' && isReady) {
-            // Trigger Extraction
-            state.activeTabs[tabId].status = 'extracting';
+        let stateDirty = false;
+        for (const idStr of activeTabIds) {
+            const tId = parseInt(idStr);
+            // If tab is NOT in the real list
+            if (!realTabIds.has(tId)) {
+                // Double check if it exists globally (in case it popped out)
+                try {
+                    const exists = await chrome.tabs.get(tId);
+                    // It exists, maybe user moved it? Keep it.
+                } catch(e) {
+                     // Truly gone
+                     delete state.activeTabs[idStr];
+                     stateDirty = true;
+                }
+            }
+        }
+        if (stateDirty) {
             await chrome.storage.local.set({ auditState: state });
+            activeTabIds = Object.keys(state.activeTabs || {}); // Refresh list
+        }
+        // -------------------------------------------------------------
 
-            // Extract async (doesn't block the loop)
-            extractSingleTab(state, tabId, tabInfo).then(async (result) => {
-                // Fetch fresh state to avoid race conditions
-                const freshData = await chrome.storage.local.get(['auditState', 'auditResults']);
-                let freshState = freshData.auditState;
-                const freshResults = freshData.auditResults || [];
+        // Process existing tabs
+        for (const tabId of activeTabIds) {
+            const tabInfo = state.activeTabs[tabId];
+            // If tab is extracting, skip
+            if (tabInfo.status === 'extracting') continue;
 
-                if(!freshState) return; // Scan stopped or cleared
+            // Check readiness: Either onUpdated fired (loaded=true) OR timeout (10s) passed
+            // This removes the arbitrary 2s wait for fast pages
+            const isReady = tabInfo.loaded || (now - tabInfo.startTime > 10000);
 
-                if (result) {
-                    if (result.error === "CAPTCHA_DETECTED") {
-                        handleCaptcha(freshState, tabId);
-                        return;
+            if (tabInfo.status === 'loading' && isReady) {
+                // Trigger Extraction
+                state.activeTabs[tabId].status = 'extracting';
+                await chrome.storage.local.set({ auditState: state });
+
+                // Extract async (doesn't block the loop)
+                extractSingleTab(state, tabId, tabInfo).then(async (result) => {
+                    // Fetch fresh state to avoid race conditions
+                    const freshData = await chrome.storage.local.get(['auditState', 'auditResults']);
+                    let freshState = freshData.auditState;
+                    const freshResults = freshData.auditResults || [];
+
+                    if(!freshState) return; // Scan stopped or cleared
+
+                    if (result) {
+                        if (result.error === "CAPTCHA_DETECTED") {
+                            handleCaptcha(freshState, tabId);
+                            return;
+                        }
+
+                        // Retry Logic
+                        const isRetryable = result.error === "extraction_crash" || result.error === "extraction_failed" || result.error === "INTERSTITIAL_REDIRECT";
+                        const freshTabInfo = freshState.activeTabs ? freshState.activeTabs[tabId] : null;
+                        const currentRetries = (freshTabInfo && freshTabInfo.retries) ? freshTabInfo.retries : 0;
+
+                        if (isRetryable && currentRetries < 2 && freshTabInfo) {
+                            freshState.activeTabs[tabId].retries = currentRetries + 1;
+                            freshState.activeTabs[tabId].status = 'loading';
+                            freshState.activeTabs[tabId].loaded = false;
+                            freshState.activeTabs[tabId].startTime = Date.now();
+
+                            await chrome.storage.local.set({ auditState: freshState });
+                            try { await chrome.tabs.reload(parseInt(tabId)); } catch(e) {}
+                            return;
+                        }
+
+                        freshResults.push(result);
+                        freshState.processedCount++;
                     }
 
-                    // Retry Logic
-                    const isRetryable = result.error === "extraction_crash" || result.error === "extraction_failed" || result.error === "INTERSTITIAL_REDIRECT";
-                    const freshTabInfo = freshState.activeTabs ? freshState.activeTabs[tabId] : null;
-                    const currentRetries = (freshTabInfo && freshTabInfo.retries) ? freshTabInfo.retries : 0;
+                    // Cleanup tab
+                    if (freshState.activeTabs) delete freshState.activeTabs[tabId];
+                    try { await chrome.tabs.remove(parseInt(tabId)); } catch(e) {}
 
-                    if (isRetryable && currentRetries < 2 && freshTabInfo) {
-                        freshState.activeTabs[tabId].retries = currentRetries + 1;
-                        freshState.activeTabs[tabId].status = 'loading';
-                        freshState.activeTabs[tabId].loaded = false;
-                        freshState.activeTabs[tabId].startTime = Date.now();
+                    // Save and continue loop
+                    await chrome.storage.local.set({ auditState: freshState, auditResults: freshResults });
+                    createAlarm('QUEUE_PROCESS', 50); // Fast cycle
+                });
+            }
+        }
 
-                        await chrome.storage.local.set({ auditState: freshState });
-                        try { await chrome.tabs.reload(parseInt(tabId)); } catch(e) {}
-                        return;
-                    }
+        // 2. Fill Pool (Start New Tabs)
+        const activeCount = Object.keys(state.activeTabs || {}).length;
+        const itemsLeft = state.urlsToProcess.length - state.queueIndex;
 
-                    freshResults.push(result);
-                    freshState.processedCount++;
+        if (activeCount < CONCURRENCY_LIMIT && itemsLeft > 0) {
+            // Verify Worker Window Exists before opening tabs
+            let targetWindowId = state.workerWindowId;
+            let windowExists = false;
+            if (targetWindowId) {
+                try {
+                    await chrome.windows.get(targetWindowId);
+                    windowExists = true;
+                } catch (e) {
+                    windowExists = false;
+                }
+            }
+
+            if (!windowExists) {
+                // Window gone, recreate
+                const win = await chrome.windows.create({ url: 'about:blank', type: 'popup', state: 'minimized', focused: false });
+                targetWindowId = win.id;
+                state.workerWindowId = win.id;
+                await chrome.storage.local.set({ auditState: state });
+            }
+
+            // Calculate how many to open
+            const slotsAvailable = CONCURRENCY_LIMIT - activeCount;
+            const toOpen = Math.min(slotsAvailable, itemsLeft);
+
+            for (let i = 0; i < toOpen; i++) {
+                const itemIndex = state.queueIndex + i;
+                const item = state.urlsToProcess[itemIndex];
+
+                // Handle both simple strings and task objects
+                let url = (typeof item === 'string') ? item : (item.url || item);
+                let isVC = false;
+
+                // Explicit Task Object Logic (Type 2 Audit)
+                if (item.type === 'vc') isVC = true;
+                // Legacy Vendor Logic (CSV with SKU/VendorCode)
+                else if (state.mode === 'vendor' && item.asin && item.sku && item.vendorCode) {
+                    isVC = true;
+                    url = `https://vendorcentral.amazon.com/abis/listing/edit?sku=${item.sku}&asin=${item.asin}&vendorCode=${item.vendorCode}`;
                 }
 
-                // Cleanup tab
-                if (freshState.activeTabs) delete freshState.activeTabs[tabId];
-                try { await chrome.tabs.remove(parseInt(tabId)); } catch(e) {}
+                try {
+                    const createProps = { url: url, active: false };
+                    if (targetWindowId) createProps.windowId = targetWindowId;
 
-                // Save and continue loop
-                await chrome.storage.local.set({ auditState: freshState, auditResults: freshResults });
-                createAlarm('QUEUE_PROCESS', 50); // Fast cycle
-            });
-        }
-    }
-
-    // 2. Fill Pool (Start New Tabs)
-    const activeCount = Object.keys(state.activeTabs || {}).length;
-    const itemsLeft = state.urlsToProcess.length - state.queueIndex;
-
-    if (activeCount < CONCURRENCY_LIMIT && itemsLeft > 0) {
-        // Calculate how many to open
-        const slotsAvailable = CONCURRENCY_LIMIT - activeCount;
-        const toOpen = Math.min(slotsAvailable, itemsLeft);
-
-        for (let i = 0; i < toOpen; i++) {
-            const itemIndex = state.queueIndex + i;
-            const item = state.urlsToProcess[itemIndex];
-
-            // Handle both simple strings and task objects
-            let url = (typeof item === 'string') ? item : (item.url || item);
-            let isVC = false;
-
-            // Explicit Task Object Logic (Type 2 Audit)
-            if (item.type === 'vc') isVC = true;
-            // Legacy Vendor Logic (CSV with SKU/VendorCode)
-            else if (state.mode === 'vendor' && item.asin && item.sku && item.vendorCode) {
-                isVC = true;
-                url = `https://vendorcentral.amazon.com/abis/listing/edit?sku=${item.sku}&asin=${item.asin}&vendorCode=${item.vendorCode}`;
+                    const tab = await chrome.tabs.create(createProps);
+                    state.activeTabs[tab.id] = {
+                        url: url,
+                        item: item,
+                        isVC: isVC,
+                        startTime: Date.now(),
+                        status: 'loading',
+                        retries: 0
+                    };
+                } catch(e) {
+                    console.error("Tab Create Error", e);
+                }
             }
-
-            try {
-                const createProps = { url: url, active: false };
-                if (state.workerWindowId) createProps.windowId = state.workerWindowId;
-
-                const tab = await chrome.tabs.create(createProps);
-                state.activeTabs[tab.id] = {
-                    url: url,
-                    item: item,
-                    isVC: isVC,
-                    startTime: Date.now(),
-                    status: 'loading',
-                    retries: 0
-                };
-            } catch(e) {
-                console.error("Tab Create Error", e);
-            }
+            state.queueIndex += toOpen;
+            state.statusMessage = `Scanning... Active: ${activeCount + toOpen} | Queue: ${itemsLeft - toOpen}`;
+            await chrome.storage.local.set({ auditState: state });
+        } else if (activeCount === 0 && itemsLeft === 0) {
+            await finishScan(state);
+            return;
         }
-        state.queueIndex += toOpen;
-        state.statusMessage = `Scanning... Active: ${activeCount + toOpen} | Queue: ${itemsLeft - toOpen}`;
-        await chrome.storage.local.set({ auditState: state });
-    } else if (activeCount === 0 && itemsLeft === 0) {
-        await finishScan(state);
-        return;
-    }
 
-    // Schedule next check
-    createAlarm('QUEUE_PROCESS', 1000);
+    } catch (err) {
+        console.error("Queue Process Error:", err);
+    } finally {
+        // Schedule next check guaranteed
+        createAlarm('QUEUE_PROCESS', 1000);
+    }
 }
 
 async function extractSingleTab(state, tabId, tabInfo) {
