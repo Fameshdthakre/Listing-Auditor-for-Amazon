@@ -84,16 +84,6 @@ async function startScan(payload) {
     statusMessage: "Initializing..."
   };
 
-  // 1. Create Worker Window
-  const workerWindow = await chrome.windows.create({
-      url: 'about:blank',
-      type: 'popup',
-      state: 'minimized',
-      focused: false
-  });
-
-  // Store window ID in state
-  newState.workerWindowId = workerWindow.id;
   // Initialize separated storage
   await chrome.storage.local.set({ auditState: newState, auditResults: [] });
 
@@ -161,16 +151,10 @@ async function stopScan() {
             try { await chrome.tabs.remove(tabIds); } catch(e) {}
         }
     }
-
-    // Close Worker Window
-    if (state.workerWindowId) {
-        try { await chrome.windows.remove(state.workerWindowId); } catch(e) {}
-    }
     
     state.isScanning = false;
     state.statusMessage = "Stopped by user.";
     state.activeTabs = {};
-    state.workerWindowId = null;
     state.nextActionTime = null;
     await chrome.storage.local.set({ auditState: state });
 
@@ -219,29 +203,16 @@ async function processQueue(state) {
         let activeTabIds = Object.keys(state.activeTabs || {});
 
         // --- Zombie Cleanup: Ensure all tracked tabs actually exist ---
-        let realTabs = [];
-        try {
-            if (state.workerWindowId) {
-               realTabs = await chrome.tabs.query({ windowId: state.workerWindowId });
-            }
-        } catch(e) {} // Window might be gone, handled below
-
-        const realTabIds = new Set(realTabs.map(t => t.id));
-
         let stateDirty = false;
         for (const idStr of activeTabIds) {
             const tId = parseInt(idStr);
-            // If tab is NOT in the real list
-            if (!realTabIds.has(tId)) {
-                // Double check if it exists globally (in case it popped out)
-                try {
-                    const exists = await chrome.tabs.get(tId);
-                    // It exists, maybe user moved it? Keep it.
-                } catch(e) {
-                     // Truly gone
-                     delete state.activeTabs[idStr];
-                     stateDirty = true;
-                }
+            try {
+                // Just check if the tab exists anywhere in the browser
+                await chrome.tabs.get(tId);
+            } catch (e) {
+                // Tab doesn't exist (closed by user or crashed)
+                delete state.activeTabs[idStr];
+                stateDirty = true;
             }
         }
         if (stateDirty) {
@@ -316,26 +287,6 @@ async function processQueue(state) {
         const itemsLeft = state.urlsToProcess.length - state.queueIndex;
 
         if (activeCount < CONCURRENCY_LIMIT && itemsLeft > 0) {
-            // Verify Worker Window Exists before opening tabs
-            let targetWindowId = state.workerWindowId;
-            let windowExists = false;
-            if (targetWindowId) {
-                try {
-                    await chrome.windows.get(targetWindowId);
-                    windowExists = true;
-                } catch (e) {
-                    windowExists = false;
-                }
-            }
-
-            if (!windowExists) {
-                // Window gone, recreate
-                const win = await chrome.windows.create({ url: 'about:blank', type: 'popup', state: 'minimized', focused: false });
-                targetWindowId = win.id;
-                state.workerWindowId = win.id;
-                await chrome.storage.local.set({ auditState: state });
-            }
-
             // Calculate how many to open
             const slotsAvailable = CONCURRENCY_LIMIT - activeCount;
             const toOpen = Math.min(slotsAvailable, itemsLeft);
@@ -357,8 +308,8 @@ async function processQueue(state) {
                 }
 
                 try {
+                    // Open in active window, inactive tab
                     const createProps = { url: url, active: false };
-                    if (targetWindowId) createProps.windowId = targetWindowId;
 
                     const tab = await chrome.tabs.create(createProps);
                     state.activeTabs[tab.id] = {
@@ -468,15 +419,9 @@ async function handleCaptcha(state, tabId) {
 }
 
 async function finishScan(state) {
-  // Close Worker Window
-  if (state.workerWindowId) {
-      try { await chrome.windows.remove(state.workerWindowId); } catch(e) {}
-  }
-
   state.isScanning = false;
   state.statusMessage = "Scan complete.";
   state.nextActionTime = null;
-  state.workerWindowId = null;
   await chrome.storage.local.set({ auditState: state });
 
   if (state.settings.disableImages) {
