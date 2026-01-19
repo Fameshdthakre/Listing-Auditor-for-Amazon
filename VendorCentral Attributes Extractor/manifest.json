@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "VC-Image Auditor & Scraper",
+  "version": "2.1",
+  "description": "Audits ASIN images in the background by comparing Vendor Central uploads against live Amazon PDP variants.",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Audit ASIN Images"
+  }
+}
