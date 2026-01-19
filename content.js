@@ -95,16 +95,28 @@
     };
 
     // --- AOD Scraper Function ---
-    const scrapeAOD = async () => {
+    const scrapeAOD = async (mode) => {
         try {
+            // Strategy 'verify_amazon': Check current page soldBy first
+            if (mode === 'verify_amazon') {
+                const currentSoldBy = document.querySelector('#sellerProfileTriggerId') || document.querySelector('#merchant-info span') || document.querySelector('#merchant-info');
+                if (currentSoldBy) {
+                    const txt = currentSoldBy.textContent.trim().toLowerCase();
+                    if (txt.includes('amazon')) {
+                        // Already 1st Party
+                        return [{ soldBy: 'Amazon (Main)', price: 'Main Offer', status: 'Verified 1st Party' }];
+                    }
+                }
+            }
+
             // 1. Open AOD
             const ingressBtn = document.querySelector('span[data-action="show-all-offers-display"] > a[id="aod-ingress-link"]');
             if (ingressBtn) {
                 ingressBtn.click();
                 await sleep(2000);
             } else {
-                // If button not found, we might need to navigate, but let's assume we are on the page or it opened.
-                // If strictly required, background logic should handle navigation to /gp/offer-listing/
+                // Button not found
+                return [];
             }
 
             // 2. Wait for Container
@@ -117,7 +129,7 @@
             }
             if (!container) return [];
 
-            // 3. Scroll to Load All
+            // 3. Scroll to Load All (Only if 'all' mode or we haven't found Amazon yet)
             let lastHeight = container.scrollHeight;
             let noChangeCount = 0;
             while (noChangeCount < 3) {
@@ -136,7 +148,7 @@
             const offers = [];
             const offerCards = document.querySelectorAll('div[id="aod-offer-list"] > div');
 
-            offerCards.forEach(card => {
+            for (const card of offerCards) {
                 try {
                     const priceEl = card.querySelector('span.a-price .a-offscreen');
                     const price = priceEl ? priceEl.textContent.trim() : "none";
@@ -154,20 +166,25 @@
                     const sellerRatingContainer = card.querySelector('div[id="aod-offer-seller-rating"]');
                     if (sellerRatingContainer) {
                         const content = sellerRatingContainer.textContent || "";
-                        // Rating: matches (4.5 stars) -> 4.5
                         const ratingMatch = content.match(/\(([\d.]+)\s*stars?\)/i) || content.match(/^([\d.]+)\s*out/);
                         if (ratingMatch) rating = ratingMatch[1];
-
-                        // Reviews: matches (123 ratings) -> 123
                         const reviewMatch = content.match(/\(([\d,]+)\s*ratings?\)/i);
                         if (reviewMatch) reviews = reviewMatch[1].replace(/,/g, '');
                     }
 
-                    if (price !== "none") {
-                        offers.push({ price, shipsFrom, soldBy, rating, reviews });
+                    const offerData = { price, shipsFrom, soldBy, rating, reviews };
+
+                    if (mode === 'verify_amazon') {
+                        if (soldBy.toLowerCase().includes('amazon')) {
+                            return [offerData]; // Found it, return immediately
+                        }
+                    } else if (price !== "none") {
+                        offers.push(offerData);
                     }
                 } catch(e) {}
-            });
+            }
+
+            if (mode === 'verify_amazon') return [{ status: 'No Amazon offer available' }];
 
             return offers;
 
@@ -258,7 +275,7 @@
 
     let aodData = [];
     if (window.SHOULD_SCRAPE_AOD) {
-        aodData = await scrapeAOD();
+        aodData = await scrapeAOD(window.AOD_STRATEGY);
     }
 
     // --- 3. Extract Attributes (Lazy) ---

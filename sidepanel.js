@@ -37,8 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const importWatchlistBtn = document.getElementById('importWatchlistBtn'); 
   const batchSizeInput = document.getElementById('batchSizeInput');
   const disableImagesInput = document.getElementById('disableImages');
-  const scrapeAODCurrent = document.getElementById('scrapeAODCurrent');
-  const scrapeAODBulk = document.getElementById('scrapeAODBulk');
+  // const scrapeAODCurrent = document.getElementById('scrapeAODCurrent'); // Replaced by radio
+  // const scrapeAODBulk = document.getElementById('scrapeAODBulk'); // Replaced by radio
   const fileStatus = document.getElementById('fileStatus');
   const vendorFileStatus = document.getElementById('vendorFileStatus');
   const vendorCsvInput = document.getElementById('vendorCsvInput');
@@ -1311,9 +1311,19 @@ document.addEventListener('DOMContentLoaded', () => {
        if(urlsToProcess.length === 0) { alert("No valid URLs."); return; }
     }
 
+    // Determine AOD Mode
+    let aodMode = 'off';
+    if (mode === 'current') {
+        const checked = document.querySelector('input[name="aodModeCurrent"]:checked');
+        if (checked) aodMode = checked.value;
+    } else if (mode === 'bulk') {
+        const checked = document.querySelector('input[name="aodModeBulk"]:checked');
+        if (checked) aodMode = checked.value;
+    }
+
     const settings = {
         disableImages: (mode !== 'current' && disableImagesInput.checked),
-        scrapeAOD: (mode === 'current' ? scrapeAODCurrent.checked : (mode === 'bulk' ? scrapeAODBulk.checked : false))
+        aodMode: aodMode
     };
 
     // Get batch size, cap between 1 and 30

@@ -281,9 +281,19 @@
                  📸 Snapshot
             </button>
         </div>
-        <div id="scraperAODWrapper" style="margin-top:8px; display:flex; align-items:center; gap:6px;">
-            <input type="checkbox" id="scrapeAODCurrent" style="accent-color:var(--primary);">
-            <label for="scrapeAODCurrent" style="font-size:12px; color:var(--text-main); font-weight:500;">Also Scrape Offers (AOD)</label>
+        <div id="scraperAODWrapper" style="margin-top:8px; border:1px solid var(--border); padding:6px; border-radius:6px;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">AOD / Offers Mode:</div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:11px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="radio" name="aodModeCurrent" value="off" checked style="accent-color:var(--primary);"> Off
+                </label>
+                <label style="font-size:11px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="radio" name="aodModeCurrent" value="verify_amazon" style="accent-color:var(--primary);"> Verify 1st Party (Amazon)
+                </label>
+                <label style="font-size:11px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="radio" name="aodModeCurrent" value="all" style="accent-color:var(--primary);"> Get All Offers
+                </label>
+            </div>
         </div>
         <div id="pasteStatus" style="font-size:11px; text-align:center; margin-top:4px; font-weight:600; min-height:16px;"></div>
     </div>
@@ -333,11 +343,13 @@
                   <input type="checkbox" id="disableImages"> Disable Images (Faster)
               </label>
           </div>
-          <div class="control-row">
-              <label>Scrape AOD</label>
-              <label style="font-weight:400; cursor:pointer;">
-                  <input type="checkbox" id="scrapeAODBulk"> Get All Offers
-              </label>
+          <div class="control-row" style="align-items:flex-start;">
+              <label style="margin-top:2px;">Scrape AOD</label>
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                  <label style="font-weight:400; cursor:pointer; font-size:11px;"><input type="radio" name="aodModeBulk" value="off" checked> Off</label>
+                  <label style="font-weight:400; cursor:pointer; font-size:11px;"><input type="radio" name="aodModeBulk" value="verify_amazon"> Verify 1st Party</label>
+                  <label style="font-weight:400; cursor:pointer; font-size:11px;"><input type="radio" name="aodModeBulk" value="all"> All Offers</label>
+              </div>
           </div>
       </div>
       <div id="fileStatus" style="font-size:11px; color:var(--success); margin-top:8px; font-weight:600;"></div>
