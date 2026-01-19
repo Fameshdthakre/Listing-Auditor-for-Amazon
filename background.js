@@ -71,7 +71,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 // --- Core Functions ---
 
 async function startScan(payload) {
-  const { urls, mode, settings } = payload;
+  const { urls, mode, settings, batchSize } = payload;
   
   const newState = {
     ...INITIAL_STATE,
@@ -81,6 +81,7 @@ async function startScan(payload) {
     settings,
     activeTabs: {},
     queueIndex: 0,
+    batchSize: batchSize || 10, // Default 10 if not provided
     statusMessage: "Initializing..."
   };
 
@@ -288,16 +289,17 @@ async function processQueue(state) {
             }
         }
 
-        // 2. Fill Pool (Start New Tabs)
-    // We recalculate active count based on current verified keys
-    const currentActiveKeys = Object.keys(state.activeTabs || {});
-    const activeCount = currentActiveKeys.length;
+        // 2. Fill Pool (Batch Mode)
+        // Strict Batching: Wait until ALL active tabs are closed before opening the next batch.
+        const currentActiveKeys = Object.keys(state.activeTabs || {});
+        const activeCount = currentActiveKeys.length;
         const itemsLeft = state.urlsToProcess.length - state.queueIndex;
+        const batchLimit = state.batchSize || CONCURRENCY_LIMIT;
 
-        if (activeCount < CONCURRENCY_LIMIT && itemsLeft > 0) {
-            // Calculate how many to open
-            const slotsAvailable = CONCURRENCY_LIMIT - activeCount;
-            const toOpen = Math.min(slotsAvailable, itemsLeft);
+        // Only open new tabs if NO tabs are currently active (Strict Batching)
+        // AND we have items left to process.
+        if (activeCount === 0 && itemsLeft > 0) {
+            const toOpen = Math.min(batchLimit, itemsLeft);
 
             for (let i = 0; i < toOpen; i++) {
                 const itemIndex = state.queueIndex + i;

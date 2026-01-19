@@ -1315,7 +1315,13 @@ document.addEventListener('DOMContentLoaded', () => {
         disableImages: (mode !== 'current' && disableImagesInput.checked),
         scrapeAOD: (mode === 'current' ? scrapeAODCurrent.checked : (mode === 'bulk' ? scrapeAODBulk.checked : false))
     };
-    chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode, settings } });
+
+    // Get batch size, cap between 1 and 30
+    let bSize = parseInt(batchSizeInput.value, 10);
+    if (isNaN(bSize) || bSize < 1) bSize = 1;
+    if (bSize > 30) bSize = 30;
+
+    chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode, settings, batchSize: bSize } });
   });
 
   stopBtn.addEventListener('click', () => { chrome.runtime.sendMessage({ action: 'STOP_SCAN' }); });
