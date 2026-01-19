@@ -565,6 +565,27 @@
     const hasBullets = bullets.length > 5 ? "YES" : "NO";
     const hasDescription = (description !== "none" && descLen > 5) ? "YES" : "NO";
 
+    // --- Comparison Chart Extraction ---
+    let comparisonAsins = [];
+    try {
+        const compTable = document.querySelector('table#HLCXComparisonTable');
+        if (compTable) {
+            const imageRow = compTable.querySelector('tr.comparison_table_image_row');
+            if (imageRow) {
+                const links = imageRow.querySelectorAll('a[href*="/dp/"]');
+                links.forEach(link => {
+                    const href = link.getAttribute('href');
+                    const match = href.match(/\/dp\/([A-Z0-9]{10})/);
+                    if (match && !comparisonAsins.includes(match[1])) comparisonAsins.push(match[1]);
+                });
+            }
+            if (comparisonAsins.length === 0) {
+                const inputs = compTable.querySelectorAll('input[name="asin"]'); // Often hidden inputs
+                inputs.forEach(inp => { if(inp.value && !comparisonAsins.includes(inp.value)) comparisonAsins.push(inp.value); });
+            }
+        }
+    } catch(e) { console.log("Comparison Extraction Error", e); }
+
     // --- Enhanced LQS Calculation with Visual Breakdown ---
     let score = 0;
     let breakdown = []; // Stores strings like "Title Length OK (+10)" or "Missing Images (-15)"
@@ -651,7 +672,8 @@
         hasAplus, hasBrandStory, hasVideo, hasBullets, hasDescription,
         lqs, lqsDetails: breakdown, // NEW: Export breakdown
         videoCount, deliveryLocation,
-        aodData // NEW: AOD Offers
+        aodData, // NEW: AOD Offers
+        comparisonAsins
       },
       data: items
     };
