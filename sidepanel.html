@@ -357,10 +357,17 @@
 
     <div id="vendorSection" style="display:none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
         <div class="bulk-hint">
-            Vendor Central Audit (Requires Login)
+            Vendor Central Image Audit (Requires Login)
         </div>
+
+        <div style="margin-bottom:8px;">
+            <label style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:4px;">Vendor Central Base URL:</label>
+            <input type="text" id="vcBaseUrl" placeholder="https://vendorcentral.amazon.com/..." style="width:100%; box-sizing:border-box; padding:6px; font-size:11px;" value="https://vendorcentral.amazon.com/imaging/manage?asins=">
+            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Ensure this URL points to the image manager and ends with 'asins='</div>
+        </div>
+
         <div style="margin-bottom: 8px; font-size:11px; color:var(--text-muted);">
-            Upload CSV with headers: <strong>ASIN, SKU, VendorCode</strong>
+            Upload CSV (Single Column of ASINs) or Paste
         </div>
         <div class="file-input-wrapper" style="margin-bottom: 8px;">
           <input type="file" id="vendorCsvInput" accept=".csv, .txt">
