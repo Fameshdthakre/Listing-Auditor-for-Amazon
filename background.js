@@ -8,10 +8,9 @@ const INITIAL_STATE = {
   processedCount: 0,
   settings: { disableImages: false },
   statusMessage: "Ready.",
-  nextActionTime: null 
+  nextActionTime: null,
+  targetWindowId: null
 };
-
-const CONCURRENCY_LIMIT = 5; // Reduced slightly to ensure stability in same window
 
 // --- Initialization ---
 
@@ -53,7 +52,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // --- Core Functions ---
 
 async function startScan(payload) {
-  const { urls, mode, settings } = payload;
+  const { urls, mode, settings, targetWindowId } = payload;
   
   const newState = {
     ...INITIAL_STATE,
@@ -62,7 +61,8 @@ async function startScan(payload) {
     urlsToProcess: urls,
     settings,
     processedCount: 0,
-    statusMessage: "Initializing..."
+    statusMessage: "Initializing...",
+    targetWindowId
   };
 
   await chrome.storage.local.set({ auditState: newState });
@@ -91,6 +91,7 @@ async function stopScan() {
 
   if (state) {
     state.isScanning = false;
+    // Don't clear results, just mark as stopped so UI can render what we have
     state.statusMessage = "Stopped by user.";
     state.nextActionTime = null;
     await chrome.storage.local.set({ auditState: state });
@@ -140,11 +141,16 @@ async function processBatch(state) {
         return;
     }
 
+    // Random Batch Size (5-30)
+    const minBatch = 5;
+    const maxBatch = 30;
+    const batchSize = Math.floor(Math.random() * (maxBatch - minBatch + 1)) + minBatch;
+
     // Get Chunk
-    const endIdx = Math.min(startIdx + CONCURRENCY_LIMIT, total);
+    const endIdx = Math.min(startIdx + batchSize, total);
     const chunk = state.urlsToProcess.slice(startIdx, endIdx);
 
-    state.statusMessage = `Processing ${startIdx + 1} - ${endIdx} of ${total}...`;
+    state.statusMessage = `Processing ${startIdx + 1} - ${endIdx} of ${total} (Batch Size: ${batchSize})...`;
     await chrome.storage.local.set({ auditState: state });
 
     // Track tabs created in this specific batch to ensure they are all closed
@@ -153,7 +159,10 @@ async function processBatch(state) {
     // Helper to create tabs and track them for cleanup
     const trackCreateTab = async (url) => {
         try {
-            const tab = await chrome.tabs.create({ url: url, active: false });
+            const createProps = { url: url, active: false };
+            if (state.targetWindowId) createProps.windowId = state.targetWindowId;
+
+            const tab = await chrome.tabs.create(createProps);
             if (tab) batchTabIds.push(tab.id);
             return tab;
         } catch (e) {
@@ -181,7 +190,11 @@ async function processBatch(state) {
         // This handles cases where a script might have crashed or hung
         if (batchTabIds.length > 0) {
             try {
-                await chrome.tabs.remove(batchTabIds);
+                // We attempt to remove any remaining tabs from this batch
+                // Most should be closed by auditSingleAsin, but this is a safety net
+                const currentTabs = await chrome.tabs.query({}); // Get all tabs to check existence
+                const existingIds = batchTabIds.filter(id => currentTabs.some(t => t.id === id));
+                if (existingIds.length > 0) await chrome.tabs.remove(existingIds);
             } catch (e) {
                 // Tabs might already be closed, which is fine
             }
@@ -242,15 +255,14 @@ async function auditSingleAsin(item, state, trackCreateTab) {
             files: ['content.js']
         });
 
+        // Close tab immediately after extraction to free memory
+        chrome.tabs.remove(tab.id).catch(() => {});
+
         if (result && result.result) {
             const res = result.result;
 
             // Handle Captcha
             if (res.error === "CAPTCHA_DETECTED") {
-                // Simple pause strategy: We can't easily interact in background batch mode.
-                // Just return error. User will see it.
-                // OR: We could pause the scan. But batch logic is strict.
-                // Let's mark as error.
                 return { error: "CAPTCHA_DETECTED", url: url };
             }
 
@@ -275,6 +287,8 @@ async function auditSingleAsin(item, state, trackCreateTab) {
         return { error: "no_result", url: url, queryASIN: getAsinFromUrl(url) };
 
     } catch (e) {
+        // Attempt to close tab if crash occurred
+        chrome.tabs.remove(tab.id).catch(() => {});
         return { error: "extraction_crash", url: url, details: e.toString() };
     }
 }

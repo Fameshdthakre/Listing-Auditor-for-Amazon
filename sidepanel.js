@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const csvInput = document.getElementById('csvInput');
   const pasteBtn = document.getElementById('pasteBtn');
   const importWatchlistBtn = document.getElementById('importWatchlistBtn'); 
-  const batchSizeInput = document.getElementById('batchSizeInput');
   const disableImagesInput = document.getElementById('disableImages');
   const fileStatus = document.getElementById('fileStatus');
   const auditorFileStatus = document.getElementById('auditorFileStatus');
@@ -1032,12 +1031,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   if(marketplaceData['Amazon.com']) domainSelect.value = 'Amazon.com';
 
-  batchSizeInput.addEventListener('input', () => {
-      let val = parseInt(batchSizeInput.value, 10);
-      if (val > 30) batchSizeInput.value = 30;
-      else if (val < 1) batchSizeInput.value = 1;
-  });
-
   const buildOrNormalizeUrl = (input) => {
     input = input.trim();
     if(!input) return null;
@@ -1472,11 +1465,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const scrapeAODCb = document.querySelector('.attr-checkbox[value="scrapeAOD"]');
+    const currentWindow = await chrome.windows.getCurrent();
     const settings = {
         disableImages: (mode !== 'current' && disableImagesInput.checked),
         scrapeAOD: scrapeAODCb ? scrapeAODCb.checked : false
     };
-    chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode, settings } });
+    chrome.runtime.sendMessage({
+        action: 'START_SCAN',
+        payload: {
+            urls: urlsToProcess,
+            mode,
+            settings,
+            targetWindowId: currentWindow.id
+        }
+    });
   });
 
   stopBtn.addEventListener('click', () => { chrome.runtime.sendMessage({ action: 'STOP_SCAN' }); });
