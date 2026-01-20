@@ -22,11 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabCurrent = document.getElementById('tabCurrent');
   const tabBulk = document.getElementById('tabBulk');
   const tabWatchlist = document.getElementById('tabWatchlist');
-  const tabVendor = document.getElementById('tabVendor');
+  const tabAuditor = document.getElementById('tabAuditor');
   const bulkSection = document.getElementById('bulkSection');
   const currentSection = document.getElementById('currentSection'); 
   const watchlistSection = document.getElementById('watchlistSection');
-  const vendorSection = document.getElementById('vendorSection');
+  const auditorSection = document.getElementById('auditorSection');
   
   const pasteLinksBtn = document.getElementById('pasteLinksBtn'); 
   const snapshotBtn = document.getElementById('snapshotBtn'); 
@@ -37,11 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const importWatchlistBtn = document.getElementById('importWatchlistBtn'); 
   const batchSizeInput = document.getElementById('batchSizeInput');
   const disableImagesInput = document.getElementById('disableImages');
-  const scrapeAODCurrent = document.getElementById('scrapeAODCurrent');
-  const scrapeAODBulk = document.getElementById('scrapeAODBulk');
   const fileStatus = document.getElementById('fileStatus');
-  const vendorFileStatus = document.getElementById('vendorFileStatus');
-  const vendorCsvInput = document.getElementById('vendorCsvInput');
+  const auditorFileStatus = document.getElementById('auditorFileStatus');
+  const auditorInput = document.getElementById('auditorInput');
+  const downloadAuditorTemplateBtn = document.getElementById('downloadAuditorTemplateBtn');
   const progressContainer = document.getElementById('progressContainer');
   const progressBar = document.getElementById('progressBar');
   const domainSelect = document.getElementById('domainSelect');
@@ -82,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const statTotal = document.getElementById('statTotal');
   const statLqs = document.getElementById('statLqs');
   const statIssues = document.getElementById('statIssues');
-  const scraperAODWrapper = document.getElementById('scraperAODWrapper');
   const bulkHintText = document.getElementById('bulkHintText');
   const downloadAuditTemplateBtn = document.getElementById('downloadAuditTemplateBtn');
 
@@ -205,11 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       });
   };
-
-  // Init call moved here to ensure function is defined
-  initWatchlists(() => {
-      loadWatchlist();
-  });
 
   const loadWatchlist = () => {
       const key = getWatchlistContainerKey();
@@ -890,8 +883,8 @@ document.addEventListener('DOMContentLoaded', () => {
           tabBulk.querySelector('.lock-icon').style.display = 'none';
           
           tabWatchlist.classList.remove('disabled');
-          tabVendor.classList.remove('disabled');
-          tabVendor.querySelector('.lock-icon').style.display = 'none';
+          tabAuditor.classList.remove('disabled');
+          tabAuditor.querySelector('.lock-icon').style.display = 'none';
 
           document.querySelectorAll('.pro-feature').forEach(el => { el.disabled = false; el.checked = true; });
           document.querySelectorAll('.group-select').forEach(el => el.disabled = false);
@@ -902,15 +895,15 @@ document.addEventListener('DOMContentLoaded', () => {
           msBtn.style.display = 'flex';
           logoutBtn.style.display = 'none';
           
-          if ((mode === 'bulk' || mode === 'vendor') && !document.getElementById('stopBtn').offsetParent) tabCurrent.click();
+          if ((mode === 'bulk' || mode === 'auditor') && !document.getElementById('stopBtn').offsetParent) tabCurrent.click();
           
           tabBulk.classList.add('disabled');
           tabBulk.querySelector('.lock-icon').style.display = 'inline';
           
           tabWatchlist.classList.remove('disabled');
 
-          tabVendor.classList.add('disabled');
-          tabVendor.querySelector('.lock-icon').style.display = 'inline';
+          tabAuditor.classList.add('disabled');
+          tabAuditor.querySelector('.lock-icon').style.display = 'inline';
 
           document.querySelectorAll('.pro-feature').forEach(el => { el.checked = false; el.disabled = true; });
           document.querySelector('.group-select[data-group="advanced"]').disabled = true;
@@ -934,42 +927,33 @@ document.addEventListener('DOMContentLoaded', () => {
       tabWatchlist.style.display = 'none';
 
       if (MEGA_MODE === 'scraper') {
-          // Tabs: Show Current, Hide Vendor
+          // Tabs: Show Current, Bulk, Watchlist. Hide Auditor
           tabCurrent.style.display = 'flex';
-          tabVendor.style.display = 'none';
+          tabBulk.style.display = 'flex';
+          tabWatchlist.style.display = 'flex';
+          tabAuditor.style.display = 'none';
 
           // Bulk: Hints
           bulkHintText.textContent = "Upload CSV (Headers: URL) or Paste Links";
-          downloadAuditTemplateBtn.style.display = 'none';
-
-          // AOD Options
-          scraperAODWrapper.style.display = 'flex';
-          document.querySelector('label[for="scrapeAODBulk"]').parentElement.style.display = 'block';
 
           // Force valid tab
-          if (mode === 'vendor') tabCurrent.click();
-          else if (mode === 'bulk' || mode === 'watchlist') {
-              // Stay on current if valid
+          if (mode === 'auditor') tabCurrent.click();
+          else if (mode === 'bulk' || mode === 'watchlist' || mode === 'current') {
+              // Stay on current
           } else {
               tabCurrent.click();
           }
 
       } else {
           // Auditor Mode
-          // Tabs: Hide Current, Show Vendor
+          // Tabs: Hide Current, Bulk, Watchlist. Show Auditor
           tabCurrent.style.display = 'none';
-          tabVendor.style.display = 'flex';
-
-          // Bulk: Hints
-          bulkHintText.textContent = "Upload Comparison CSV";
-          downloadAuditTemplateBtn.style.display = 'block';
-
-          // AOD Options (Hidden for Auditor?)
-          scraperAODWrapper.style.display = 'none';
-          document.querySelector('label[for="scrapeAODBulk"]').parentElement.style.display = 'none';
+          tabBulk.style.display = 'none';
+          tabWatchlist.style.display = 'none';
+          tabAuditor.style.display = 'flex';
 
           // Force valid tab
-          if (mode === 'current') tabBulk.click();
+          if (mode !== 'auditor') tabAuditor.click();
       }
   };
 
@@ -995,7 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if(m === 'current') tabCurrent.classList.add('active'); 
           else if(m === 'bulk') tabBulk.classList.add('active'); 
           else if(m === 'watchlist') tabWatchlist.classList.add('active');
-          else if(m === 'vendor') tabVendor.classList.add('active');
+          else if(m === 'auditor') tabAuditor.classList.add('active');
       }
     }
     updateMegaModeUI();
@@ -1081,10 +1065,10 @@ document.addEventListener('DOMContentLoaded', () => {
     tabCurrent.classList.add('active');
     tabBulk.classList.remove('active');
     tabWatchlist.classList.remove('active');
-    tabVendor.classList.remove('active');
+    tabAuditor.classList.remove('active');
     bulkSection.style.display = 'none';
     watchlistSection.style.display = 'none';
-    vendorSection.style.display = 'none';
+    auditorSection.style.display = 'none';
     currentSection.style.display = 'block'; 
     scanBtn.textContent = 'Start Audit (Current Tabs)';
   });
@@ -1095,11 +1079,11 @@ document.addEventListener('DOMContentLoaded', () => {
     tabBulk.classList.add('active');
     tabCurrent.classList.remove('active');
     tabWatchlist.classList.remove('active');
-    tabVendor.classList.remove('active');
+    tabAuditor.classList.remove('active');
     bulkSection.style.display = 'block';
     currentSection.style.display = 'none'; 
     watchlistSection.style.display = 'none';
-    vendorSection.style.display = 'none';
+    auditorSection.style.display = 'none';
     scanBtn.textContent = 'Start Bulk Audit';
   });
 
@@ -1108,26 +1092,26 @@ document.addEventListener('DOMContentLoaded', () => {
       tabWatchlist.classList.add('active');
       tabCurrent.classList.remove('active');
       tabBulk.classList.remove('active');
-      tabVendor.classList.remove('active');
+      tabAuditor.classList.remove('active');
       watchlistSection.style.display = 'block';
       bulkSection.style.display = 'none';
       currentSection.style.display = 'none'; 
-      vendorSection.style.display = 'none';
+      auditorSection.style.display = 'none';
       loadWatchlist(); 
   });
 
-  tabVendor.addEventListener('click', () => {
+  tabAuditor.addEventListener('click', () => {
       if (!IS_LOGGED_IN) { alert("Please Login."); return; }
-      mode = 'vendor';
-      tabVendor.classList.add('active');
+      mode = 'auditor';
+      tabAuditor.classList.add('active');
       tabCurrent.classList.remove('active');
       tabBulk.classList.remove('active');
       tabWatchlist.classList.remove('active');
-      vendorSection.style.display = 'block';
+      auditorSection.style.display = 'block';
       bulkSection.style.display = 'none';
       currentSection.style.display = 'none';
       watchlistSection.style.display = 'none';
-      scanBtn.textContent = 'Start Vendor Audit';
+      scanBtn.textContent = 'Start Auditor Mode';
   });
 
   const handlePaste = async (limit, statusEl) => {
@@ -1219,53 +1203,95 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const handleFileSelect = (file, statusEl, modeType) => {
       const reader = new FileReader();
-      reader.onload = function(event) {
-          const text = event.target.result;
-          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-          if (lines.length === 0) return;
+      const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
-          const firstLine = lines[0].toLowerCase();
-
-          if (MEGA_MODE === 'auditor') {
-              // Try parsing as Type 2 Audit CSV
-              const auditData = parseAuditType2Csv(lines);
-              if (auditData) {
-                  rawCsvData = auditData;
-                  const type2Count = auditData.filter(r => r.auditType === 'type2').length;
-                  statusEl.textContent = `Loaded ${auditData.length} items (${type2Count} w/ comparison data).`;
-                  statusEl.style.color = "var(--success)";
-                  return;
-              }
+      if (isXlsx) {
+          if (typeof XLSX === 'undefined') {
+              statusEl.textContent = "Error: XLSX library not loaded.";
+              statusEl.style.color = "var(--danger)";
+              return;
           }
+          reader.onload = function(e) {
+              try {
+                  const data = new Uint8Array(e.target.result);
+                  const workbook = XLSX.read(data, {type: 'array'});
 
-          if (modeType === 'vendor') {
-              if (!firstLine.includes('asin') || !firstLine.includes('sku') || !firstLine.includes('vendorcode')) {
-                  statusEl.textContent = "Error: Headers must match ASIN, SKU, VendorCode";
-                  statusEl.style.color = "var(--danger)";
-                  return;
-              }
-              const headers = csvLineParser(lines[0]).map(h => h.toLowerCase().replace(/['"]+/g, ''));
-              const asinIdx = headers.findIndex(h => h === 'asin');
-              const skuIdx = headers.findIndex(h => h === 'sku');
-              const vendorIdx = headers.findIndex(h => h === 'vendorcode');
+                  // In Auditor Mode, look for "Data" sheet, else first sheet
+                  const sheetName = workbook.SheetNames.find(n => n === 'Data') || workbook.SheetNames[0];
+                  const worksheet = workbook.Sheets[sheetName];
+                  const json = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
 
-              const structuredData = [];
-              for (let i = 1; i < lines.length; i++) {
-                  const cols = csvLineParser(lines[i]);
-                  if (cols[asinIdx] && cols[skuIdx] && cols[vendorIdx]) {
-                      structuredData.push({
-                          asin: cols[asinIdx].replace(/['"]+/g, ''),
-                          sku: cols[skuIdx].replace(/['"]+/g, ''),
-                          vendorCode: cols[vendorIdx].replace(/['"]+/g, '')
-                      });
+                  if (json.length === 0) {
+                      statusEl.textContent = "Empty file.";
+                      statusEl.style.color = "var(--danger)";
+                      return;
                   }
-              }
-              rawCsvData = structuredData;
-              statusEl.textContent = `Loaded ${structuredData.length} VC rows.`;
-              statusEl.style.color = "var(--success)";
 
-          } else {
-              // Regular Bulk Mode
+                  if (modeType === 'auditor') {
+                      // Normalize Auditor Headers
+                      const headerMap = {
+                          'ASIN': 'asin',
+                          'Marketplace': 'marketplace',
+                          'Approved Title': 'expected_title',
+                          'Approved Bullets': 'expected_bullets',
+                          'Approved Description': 'expected_description',
+                          'Reference Rating': 'expected_rating',
+                          'Reference Reviews': 'expected_reviews',
+                          'Approved Images': 'expected_images',
+                          'Approved Video Count': 'expected_video_count',
+                          'Approved Brand Story Images': 'expected_brand_story',
+                          'Approved A+ Modules': 'expected_aplus',
+                          'Approved Comparison ASINs': 'expected_comparison',
+                          'Approved Variation Count': 'expected_variation_count',
+                          'Approved Variation Theme': 'expected_variation_theme',
+                          'Approved Seller': 'expected_seller',
+                          'Approved Price': 'expected_price',
+                          'Max Delivery Days': 'expected_delivery_days'
+                      };
+
+                      const normalizedData = json.map(row => {
+                          const newRow = { comparisonData: {} };
+                          // ID Resolution: ASIN > URL > query_asin
+                          if (row['ASIN']) newRow.url = row['ASIN'];
+                          else if (row['URL']) newRow.url = row['URL'];
+                          else if (row['page_url']) newRow.url = row['page_url'];
+
+                          Object.keys(headerMap).forEach(header => {
+                              if (row[header] !== undefined && row[header] !== "") {
+                                  newRow.comparisonData[headerMap[header]] = row[header];
+                              }
+                          });
+                          newRow.auditType = 'type2';
+                          return newRow;
+                      }).filter(r => r.url);
+
+                      rawCsvData = normalizedData;
+                      statusEl.textContent = `Loaded ${normalizedData.length} items from XLSX.`;
+                      statusEl.style.color = "var(--success)";
+                  } else {
+                      // Bulk Scraper Mode (XLSX support for simple lists)
+                      const list = json.map(r => r['URL'] || r['ASIN'] || r['url'] || r['asin']).filter(Boolean);
+                      rawCsvData = list;
+                      statusEl.textContent = `Loaded ${list.length} items from XLSX.`;
+                      statusEl.style.color = "var(--success)";
+                  }
+              } catch(err) {
+                  console.error(err);
+                  statusEl.textContent = "Error parsing XLSX.";
+                  statusEl.style.color = "var(--danger)";
+              }
+          };
+          reader.readAsArrayBuffer(file);
+      } else {
+          // Legacy CSV Logic
+          reader.onload = function(event) {
+              const text = event.target.result;
+              const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+              if (lines.length === 0) return;
+
+              const firstLine = lines[0].toLowerCase();
+
+              // Scraper Bulk CSV
               if (firstLine.includes(',') && (firstLine.includes('url') || firstLine.includes('asin'))) {
                   const headers = csvLineParser(lines[0]).map(h => h.toLowerCase().replace(/['"]+/g, ''));
                   const urlIndex = headers.findIndex(h => h.includes('url') || h.includes('asin'));
@@ -1294,41 +1320,33 @@ document.addEventListener('DOMContentLoaded', () => {
                   statusEl.textContent = `Loaded ${lines.length} lines.`;
               }
               statusEl.style.color = "var(--success)";
-          }
-      };
-      reader.readAsText(file);
+          };
+          reader.readAsText(file);
+      }
   };
 
   csvInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], fileStatus, 'bulk'));
-  vendorCsvInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], vendorFileStatus, 'vendor'));
+  auditorInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], auditorFileStatus, 'auditor'));
 
   scanBtn.addEventListener('click', async () => {
     let urlsToProcess = [];
 
-    if (mode === 'vendor') {
-        // This tab is now specific to "Type 2" or Vendor Auth audit
+    if (mode === 'auditor') {
         if (!IS_LOGGED_IN) { alert("Login required."); return; }
         if (rawCsvData.length === 0) { alert("No Data Loaded."); return; }
-        // For Auditor Mode, we might want to trigger dual scraping here if Type 2
-        urlsToProcess = rawCsvData.map(d => {
-             // If we loaded via parseAuditType2Csv, d has url/auditType.
-             // If via handleFileSelect vendor, d has asin/sku/vendorCode
-             if (d.auditType === 'type2') {
-                 // Construct DUAL Task
-                 const asin = d.url.match(/([A-Z0-9]{10})/)?.[1];
-                 if (!asin) return null;
-                 const pdpUrl = buildOrNormalizeUrl(d.url);
-                 const vcDomain = getVendorCentralDomain(domainSelect.value);
-                 const vcUrl = `https://${vcDomain}/imaging/manage?asins=${asin}`;
 
-                 return [
-                     { url: pdpUrl, type: 'pdp', id: asin, comparisonData: d.comparisonData },
-                     { url: vcUrl, type: 'vc', id: asin }
-                 ];
-             } else {
-                 return d; // Fallback to raw object or standard scrape
+        // Use rawCsvData which should be populated by the auditor input parser
+        urlsToProcess = rawCsvData.map(d => {
+             if (d.auditType === 'type2') { // Legacy check or new Logic
+                 // For now, assume single URL unless dual logic is requested later
+                 return d;
              }
+             // For the new Auditor Mode, we treat d as an object with 'url' and comparisonData
+             return d;
         }).flat().filter(Boolean);
+
+        // Note: The logic for parsing XLSX will be handled in the next step.
+        // For now, we assume handleFileSelect populates rawCsvData correctly.
 
     } else if (mode === 'current') {
        if (rawCsvData.length > 0) {
@@ -1370,9 +1388,10 @@ document.addEventListener('DOMContentLoaded', () => {
        if(urlsToProcess.length === 0) { alert("No valid URLs."); return; }
     }
 
+    const scrapeAODCb = document.querySelector('.attr-checkbox[value="scrapeAOD"]');
     const settings = {
         disableImages: (mode !== 'current' && disableImagesInput.checked),
-        scrapeAOD: (mode === 'current' ? scrapeAODCurrent.checked : (mode === 'bulk' ? scrapeAODBulk.checked : false))
+        scrapeAOD: scrapeAODCb ? scrapeAODCb.checked : false
     };
     chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode, settings } });
   });
@@ -1656,17 +1675,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add Comparison Headers if Audit Mode
     if (MEGA_MODE === 'auditor') {
-        const auditHeaders = [
-            "User: Title", "Match: Title",
-            "User: Bullets", "Match: Bullets",
-            "User: Description", "Match: Description",
-            "User: Images", "Match: User Images",
-            "VC: Images", "Match: VC Images",
-            "User: Videos", "Match: Videos",
-            "User: A+", "Match: A+",
-            "User: Brand Story", "Match: Brand Story"
+        const auditFields = [
+            "Title", "Bullets", "Description",
+            "Rating", "Reviews",
+            "Images", "Video Count",
+            "Brand Story", "A+ Modules",
+            "Comparison ASINs",
+            "Variation Count", "Variation Theme",
+            "Seller", "Price"
         ];
-        finalHeaders.push(...auditHeaders);
+        auditFields.forEach(f => {
+            finalHeaders.push(`Expected ${f}`, `Match ${f}`);
+        });
+        finalHeaders.push("Expected Max Days", "Actual Delivery", "Match Delivery");
     } else {
         // Legacy Watchlist Comparison (if scraping mode but watchlist used)
         const hasExpectedData = results.some(r => r.expected);
@@ -1829,55 +1850,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- Audit Mode Comparisons (Type 2) ---
+        // --- Audit Mode Comparisons (10 Audits) ---
         if (MEGA_MODE === 'auditor') {
             const comp = tabData.comparisonData || {};
+            const attrs = tabData.attributes;
 
-            // 1. Title
-            const userTitle = comp.item_name || "none";
-            row['User: Title'] = userTitle;
-            row['Match: Title'] = (userTitle !== "none" && tabData.attributes.metaTitle === userTitle) ? "TRUE" : "FALSE";
+            const setMatch = (label, expected, actual, type='exact') => {
+                if (!expected) {
+                    row[`Expected ${label}`] = "N/A";
+                    row[`Match ${label}`] = "N/A";
+                    return;
+                }
+                row[`Expected ${label}`] = expected;
 
-            // 2. Bullets
-            const userBullets = comp.bullet_point || "none";
-            row['User: Bullets'] = userBullets;
-            // Simple logic: check if user text is contained in scraped bullets
-            row['Match: Bullets'] = (userBullets !== "none" && tabData.attributes.bullets.includes(userBullets)) ? "TRUE" : "FALSE";
+                let match = false;
+                if (type === 'exact') match = (String(actual).trim() === String(expected).trim());
+                else if (type === 'contains') match = (String(actual).includes(String(expected)));
+                else if (type === 'gte') match = (parseFloat(actual) >= parseFloat(expected));
+                else if (type === 'lte') match = (parseFloat(actual) <= parseFloat(expected));
+                else if (type === 'list') {
+                    const expList = String(expected).split(',').map(s => s.trim());
+                    const actStr = JSON.stringify(actual);
+                    match = expList.every(item => actStr.includes(item));
+                }
 
-            // 3. Description
-            const userDesc = comp.product_description || "none";
-            row['User: Description'] = userDesc;
-            row['Match: Description'] = (userDesc !== "none" && tabData.attributes.description.includes(userDesc)) ? "TRUE" : "FALSE";
+                row[`Match ${label}`] = match ? "TRUE" : "FALSE";
+            };
 
-            // 4. Images (User provided)
-            const userImgs = comp.product_image_details || [];
-            row['User: Images'] = Array.isArray(userImgs) ? JSON.stringify(userImgs) : userImgs;
-            // Complex match? For now just existence
-            row['Match: User Images'] = (Array.isArray(userImgs) && userImgs.length > 0 && tabData.data.length >= userImgs.length) ? "TRUE" : "FALSE";
+            setMatch("Title", comp.expected_title, attrs.metaTitle);
+            setMatch("Bullets", comp.expected_bullets, attrs.bullets, 'contains');
+            setMatch("Description", comp.expected_description, attrs.description, 'contains');
+            setMatch("Rating", comp.expected_rating, attrs.rating, 'gte');
+            setMatch("Reviews", comp.expected_reviews, attrs.reviews, 'gte');
+            setMatch("Images", comp.expected_images, tabData.data, 'list');
+            setMatch("Video Count", comp.expected_video_count, attrs.videoCount, 'gte');
+            setMatch("Brand Story", comp.expected_brand_story, attrs.brandStoryImgs, 'list');
+            setMatch("A+ Modules", comp.expected_aplus, attrs.aPlusImgs, 'list');
+            setMatch("Comparison ASINs", comp.expected_comparison, attrs.comparisonAsins, 'list');
+            setMatch("Variation Count", comp.expected_variation_count, attrs.variationCount, 'exact');
+            setMatch("Variation Theme", comp.expected_variation_theme, attrs.variationTheme, 'exact');
+            setMatch("Seller", comp.expected_seller, attrs.soldBy);
+            setMatch("Price", comp.expected_price, attrs.displayPrice, 'exact');
 
-            // 5. Images (VC provided)
-            const vcImgs = tabData.vcData ? tabData.vcData.images : [];
-            row['VC: Images'] = vcImgs ? JSON.stringify(vcImgs) : "none";
-            // Check if VC images exist in PDP data (by URL or count)
-            // Ideally we check if every VC image URL is present in PDP data.
-            // But VC URLs might differ from PDP display URLs (resizing).
-            // Fallback: Check Count
-            row['Match: VC Images'] = (vcImgs && vcImgs.length > 0 && tabData.data.length >= vcImgs.length) ? "TRUE" : "FALSE";
-
-            // 6. Videos
-            const userVids = comp.videos || [];
-            row['User: Videos'] = Array.isArray(userVids) ? JSON.stringify(userVids) : userVids;
-            row['Match: Videos'] = (Array.isArray(userVids) && userVids.length > 0 && tabData.attributes.videoCount >= userVids.length) ? "TRUE" : "FALSE";
-
-            // 7. A+
-            const userAplus = comp.aplus_image_modules || [];
-            row['User: A+'] = Array.isArray(userAplus) ? JSON.stringify(userAplus) : userAplus;
-            row['Match: A+'] = (Array.isArray(userAplus) && userAplus.length > 0 && tabData.attributes.aPlusImgs.length >= userAplus.length) ? "TRUE" : "FALSE";
-
-            // 8. Brand Story
-            const userBs = comp.brand_story_images || [];
-            row['User: Brand Story'] = Array.isArray(userBs) ? JSON.stringify(userBs) : userBs;
-            row['Match: Brand Story'] = (Array.isArray(userBs) && userBs.length > 0 && tabData.attributes.brandStoryImgs.length >= userBs.length) ? "TRUE" : "FALSE";
+            row["Expected Max Days"] = comp.expected_delivery_days || "N/A";
+            row["Actual Delivery"] = attrs.primeOrFastestDeliveryDate || attrs.freeDeliveryDate || "N/A";
+            row["Match Delivery"] = (comp.expected_delivery_days) ? "MANUAL" : "N/A";
 
         } else if (tabData.expected && !tabData.error) {
             // Legacy Watchlist Comparison
@@ -2340,26 +2357,54 @@ document.addEventListener('DOMContentLoaded', () => {
   // Insert download button in Watchlist section
   document.getElementById('watchlistSection').appendChild(downloadTemplateBtn);
 
-  // Template Download for Audit Type 2
-  downloadAuditTemplateBtn.addEventListener('click', () => {
-      const headers = [
-          'ASIN',
-          'item_name',
-          'bullet_point',
-          'product_description',
-          'videos',
-          'aplus_image_modules',
-          'brand_story_images'
+  // Template Download for Auditor Mode (XLSX)
+  downloadAuditorTemplateBtn.addEventListener('click', () => {
+      if (typeof XLSX === 'undefined') { alert("SheetJS not loaded."); return; }
+
+      const wb = XLSX.utils.book_new();
+
+      // 1. Instructions Sheet
+      const instructions = [
+          ["Listing Auditor Template Instructions"],
+          [""],
+          ["Column Name", "Description", "Format"],
+          ["ASIN", "Target ASIN to audit", "B0..."],
+          ["Marketplace", "Amazon Domain (Optional)", "Amazon.com"],
+          ["Approved Title", "Exact title text to match", "Text"],
+          ["Approved Bullets", "Bullet text to match (contains)", "Text"],
+          ["Approved Description", "Description text to match (contains)", "Text"],
+          ["Reference Rating", "Minimum Acceptable Rating", "Number (e.g. 4.5)"],
+          ["Reference Reviews", "Minimum Review Count", "Number"],
+          ["Approved Images", "List of Image URLs", "Comma separated URLs"],
+          ["Approved Video Count", "Expected number of videos", "Number"],
+          ["Approved Brand Story Images", "List of Brand Story Image URLs", "Comma separated URLs"],
+          ["Approved A+ Modules", "List of A+ Module Image URLs", "Comma separated URLs"],
+          ["Approved Comparison ASINs", "List of ASINs in Comparison Chart", "Comma separated ASINs"],
+          ["Approved Variation Count", "Expected Total Variations", "Number"],
+          ["Approved Variation Theme", "Expected Theme Name", "Text (e.g. Size, Color)"],
+          ["Approved Seller", "Expected BuyBox Seller Name", "Text"],
+          ["Approved Price", "Expected Price", "Number"],
+          ["Max Delivery Days", "Maximum acceptable delivery time", "Number"]
       ];
-      const csvContent = headers.join(",") + "\n" + "B00EXAMPLE,My Title,Bullet 1|Bullet 2,Desc,[link1,link2],[link1],[link1]";
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", "Audit_Comparison_Template.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const wsInst = XLSX.utils.aoa_to_sheet(instructions);
+      XLSX.utils.book_append_sheet(wb, wsInst, "Instructions");
+
+      // 2. Data Sheet
+      const headers = [
+          "ASIN", "Marketplace",
+          "Approved Title", "Approved Bullets", "Approved Description",
+          "Reference Rating", "Reference Reviews",
+          "Approved Images", "Approved Video Count",
+          "Approved Brand Story Images", "Approved A+ Modules",
+          "Approved Comparison ASINs",
+          "Approved Variation Count", "Approved Variation Theme",
+          "Approved Seller", "Approved Price",
+          "Max Delivery Days"
+      ];
+      const wsData = XLSX.utils.aoa_to_sheet([headers]);
+      XLSX.utils.book_append_sheet(wb, wsData, "Data");
+
+      XLSX.writeFile(wb, "Auditor_Template.xlsx");
   });
   // --- Feature: Visual Tracker (Chart.js) ---
   const chartModal = document.getElementById('chartModal');
@@ -2459,4 +2504,9 @@ document.addEventListener('DOMContentLoaded', () => {
           console.error("Fetch Error", e);
       }
   };
+
+  // Init Watchlists
+  initWatchlists(() => {
+      loadWatchlist();
+  });
 });
