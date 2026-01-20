@@ -787,10 +787,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   msBtn.addEventListener('click', () => {
-      if (MS_CLIENT_ID === "YOUR_MICROSOFT_CLIENT_ID_HERE") {
-          alert("Developer Config Error: Please add Microsoft Client ID in popup.js");
-          return;
-      }
       const redirectUri = chrome.identity.getRedirectURL();
       const scope = "openid profile User.Read email";
       const nonce = Math.random().toString(36).substring(2, 15);
