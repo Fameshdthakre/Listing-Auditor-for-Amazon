@@ -1,5 +1,4 @@
 import { initializeApp } from './firebase-app.js';
-// import { getAnalytics } from './firebase-analytics.js'; // Disabled due to CSP
 import { getFirestore } from './firebase-firestore.js';
 
 // Your web app's Firebase configuration

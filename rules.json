@@ -59,7 +59,6 @@
     "action": { "type": "block" },
     "condition": {
       "resourceTypes": ["image"],
-      "domainType": "firstParty",
       "initiatorDomains": ["amazon.com", "amazon.ca", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.it", "amazon.es", "amazon.nl", "amazon.se", "amazon.com.be", "amazon.com.au", "amazon.sg", "amazon.ae", "amazon.sa", "amazon.eg", "amazon.in", "amazon.co.jp"]
     }
   }
