@@ -1791,11 +1791,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Only create tabs if the parent field is selected
     const tabMap = {};
-    if (selectedFields.includes('variationFamily')) tabMap.variationFamily = createTab('variationFamily', ['pageASIN']);
-    if (selectedFields.includes('bullets')) tabMap.bullets = createTab('bullets', ['pageASIN']);
-    if (selectedFields.includes('brandStoryImgs')) tabMap.brandStoryImgs = createTab('brandStoryImgs', ['pageASIN']);
-    if (selectedFields.includes('aPlusImgs')) tabMap.aPlusImgs = createTab('aPlusImgs', ['pageASIN']);
-    if (selectedFields.includes('videos')) tabMap.videos = createTab('videos', ['pageASIN']);
+    const countTrackers = { variationFamily: 0, bullets: 0, brandStoryImgs: 0, aPlusImgs: 0, videos: 0 };
+
+    if (selectedFields.includes('variationFamily')) tabMap.variationFamily = createTab('variationFamily', ['pageASIN', 'variation_family_count']);
+    if (selectedFields.includes('bullets')) tabMap.bullets = createTab('bullets', ['pageASIN', 'bullet_count']);
+    if (selectedFields.includes('brandStoryImgs')) tabMap.brandStoryImgs = createTab('brandStoryImgs', ['pageASIN', 'brand_story_image_count']);
+    if (selectedFields.includes('aPlusImgs')) tabMap.aPlusImgs = createTab('aPlusImgs', ['pageASIN', 'aplus_image_count']);
+    if (selectedFields.includes('videos')) tabMap.videos = createTab('videos', ['pageASIN', 'video_count']);
     if (selectedFields.includes('imgVariantDetails')) tabMap.imgVariantDetails = createTab('imgVariantDetails', ['pageASIN', 'variant', 'hiRes', 'large']);
 
     // Always create Offers tab if data exists, or conditionally? Let's check results first.
@@ -1874,35 +1876,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch(e) { console.error("Error parsing variationFamily:", e); }
 
                 if (Array.isArray(vFamilies) && vFamilies.length > 0) {
-                    tabMap.variationFamily.rows.push([pageASIN, ...vFamilies]);
+                    if (vFamilies.length > countTrackers.variationFamily) countTrackers.variationFamily = vFamilies.length;
+                    tabMap.variationFamily.rows.push([pageASIN, vFamilies.length, ...vFamilies]);
                 }
             }
             if (tabMap.bullets) {
                 const bText = tabData.attributes.bullets;
                 if (bText && bText !== 'none') {
                     const bList = bText.split('|').map(s => s.trim());
-                    tabMap.bullets.rows.push([pageASIN, ...bList]);
+                    if (bList.length > countTrackers.bullets) countTrackers.bullets = bList.length;
+                    tabMap.bullets.rows.push([pageASIN, bList.length, ...bList]);
                 }
             }
             if (tabMap.brandStoryImgs) {
                 const bs = tabData.attributes.brandStoryImgs;
                 if (Array.isArray(bs) && bs.length > 0) {
                     const urls = bs.map(item => item['brand-story-image']);
-                    tabMap.brandStoryImgs.rows.push([pageASIN, ...urls]);
+                    if (urls.length > countTrackers.brandStoryImgs) countTrackers.brandStoryImgs = urls.length;
+                    tabMap.brandStoryImgs.rows.push([pageASIN, urls.length, ...urls]);
                 }
             }
             if (tabMap.aPlusImgs) {
                 const ap = tabData.attributes.aPlusImgs;
                 if (Array.isArray(ap) && ap.length > 0) {
                     const urls = ap.map(item => item['a-plus-image']);
-                    tabMap.aPlusImgs.rows.push([pageASIN, ...urls]);
+                    if (urls.length > countTrackers.aPlusImgs) countTrackers.aPlusImgs = urls.length;
+                    tabMap.aPlusImgs.rows.push([pageASIN, urls.length, ...urls]);
                 }
             }
             if (tabMap.videos) {
                 const vids = tabData.attributes.videos;
                 if (Array.isArray(vids) && vids.length > 0) {
                     const urls = vids.map(item => item['video_url']);
-                    tabMap.videos.rows.push([pageASIN, ...urls]);
+                    if (urls.length > countTrackers.videos) countTrackers.videos = urls.length;
+                    tabMap.videos.rows.push([pageASIN, urls.length, ...urls]);
                 }
             }
             if (tabMap.imgVariantDetails) {
@@ -2004,6 +2011,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const rowStr = finalHeaders.map(h => cleanField(row[h])).join(",");
         return { rowObj: row, csvLine: rowStr };
     });
+
+    // --- Update Dynamic Headers for Tabs ---
+    if (tabMap.variationFamily) {
+        for(let i=1; i<=countTrackers.variationFamily; i++) tabMap.variationFamily.headers.push(`child_ASIN${i}`);
+    }
+    if (tabMap.bullets) {
+        for(let i=1; i<=countTrackers.bullets; i++) tabMap.bullets.headers.push(`bullet_${i}`);
+    }
+    if (tabMap.brandStoryImgs) {
+        for(let i=1; i<=countTrackers.brandStoryImgs; i++) tabMap.brandStoryImgs.headers.push(`image_${i}`);
+    }
+    if (tabMap.aPlusImgs) {
+        for(let i=1; i<=countTrackers.aPlusImgs; i++) tabMap.aPlusImgs.headers.push(`image_${i}`);
+    }
+    if (tabMap.videos) {
+        for(let i=1; i<=countTrackers.videos; i++) tabMap.videos.headers.push(`video_url_${i}`);
+    }
 
     Object.values(tabMap).forEach(tab => tabsData.push(tab));
 
