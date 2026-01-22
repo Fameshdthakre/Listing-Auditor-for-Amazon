@@ -43,7 +43,7 @@
     [data-theme="dark"] .dash-card, 
     [data-theme="dark"] .options-container, 
     [data-theme="dark"] #bulkSection, 
-    [data-theme="dark"] #watchlistSection { 
+    [data-theme="dark"] #catalogueSection {
         background: var(--surface) !important; 
         border-color: var(--border) !important; 
     }
@@ -155,7 +155,7 @@
     .mode-tab.disabled { opacity: 0.6; cursor: not-allowed; color: var(--text-muted); }
     .lock-icon { font-size: 12px; }
 
-    #bulkSection, #watchlistSection { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+    #bulkSection, #catalogueSection { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
     #currentSection { display: block; margin-bottom: 16px; }
     .bulk-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; }
     .file-input-wrapper input { width: 100%; font-size: 12px; color: var(--text-muted); }
@@ -180,9 +180,9 @@
 
     .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
     button { padding: 10px; border-radius: 6px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; flex: 1; }
-    #scanBtn, #auditWatchlistBtn { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); }
-    #scanBtn:hover, #auditWatchlistBtn:hover { background: var(--primary-hover); transform: translateY(-1px); }
-    #scanBtn:disabled, #auditWatchlistBtn:disabled { background: #93c5fd; cursor: not-allowed; transform: none; }
+    #scanBtn, #auditCatalogueBtn { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); }
+    #scanBtn:hover, #auditCatalogueBtn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    #scanBtn:disabled, #auditCatalogueBtn:disabled { background: #93c5fd; cursor: not-allowed; transform: none; }
     #stopBtn { background: var(--danger); color: white; display: none; }
     #stopBtn:hover { background: #dc2626; }
     
@@ -207,7 +207,7 @@
     #downloadBtn { background: #eff6ff; color: var(--primary); border: 1px solid #bfdbfe; }
     #downloadBtn:hover { background: #dbeafe; }
 
-    #watchlistItems { max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; background: var(--surface); }
+    #catalogueItems { max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; background: var(--surface); }
     .wl-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text-main); }
     .wl-item:last-child { border-bottom: none; }
     .wl-info { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 8px; }
@@ -269,7 +269,7 @@
       <div class="mode-tab active" id="tabCurrent">Current Window</div>
       <div class="mode-tab disabled" id="tabBulk">Bulk / CSV <span class="lock-icon">🔒</span></div>
       <div class="mode-tab disabled" id="tabAuditor" style="display:none;">Auditor Setup <span class="lock-icon">🔒</span></div>
-      <div class="mode-tab" id="tabWatchlist" style="display:none !important;">Watchlist</div>
+      <div class="mode-tab" id="tabCatalogue">Catalogue</div>
     </div>
     
     <div id="currentSection">
@@ -296,8 +296,8 @@
               <button id="pasteBtn" style="flex:1; padding: 10px; font-size: 12px; background: rgba(15, 23, 42, 1); border: 2px dashed var(--primary); color: var(--primary); font-weight: 700; cursor: pointer; border-radius: 6px;">
                  📋 Paste ASINs
               </button>
-              <button id="importWatchlistBtn" style="display:none !important; flex:1; padding: 10px; font-size: 12px; background: rgba(255, 237, 213, 0.5); border: 2px dashed #fb923c; color: #c2410c; font-weight: 700; cursor: pointer; border-radius: 6px;">
-                 📥 Import Watchlist
+              <button id="importCatalogueBtn" style="display:none !important; flex:1; padding: 10px; font-size: 12px; background: rgba(255, 237, 213, 0.5); border: 2px dashed #fb923c; color: #c2410c; font-weight: 700; cursor: pointer; border-radius: 6px;">
+                 📥 Import Catalogue
               </button>
           </div>
           <button id="downloadAuditTemplateBtn" style="width:100%; margin-top:8px; padding:8px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:4px; cursor:pointer; display:none;">
@@ -333,34 +333,45 @@
         <div class="bulk-hint">
             Auditor Mode
         </div>
+
+        <!-- Source A: Saved Catalogue -->
+        <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border);">
+            <div style="margin-bottom: 6px; font-size:11px; font-weight:600; color:var(--text-main);">Load from Catalogue</div>
+            <div style="display:flex; gap:6px;">
+                <select id="auditorCatalogueSelect" style="flex:1;"></select>
+                <button id="loadFromCatalogueBtn" style="flex:none; width:auto; padding:6px 12px; font-size:11px; background:var(--primary); color:white;">Load</button>
+            </div>
+        </div>
+
+        <!-- Source B: File Upload -->
         <div style="margin-bottom: 8px; font-size:11px; color:var(--text-muted);">
-            Upload filled Auditor Template (.xlsx)
+            Or Upload filled Auditor Template (.xlsx)
         </div>
         <div class="file-input-wrapper" style="margin-bottom: 8px;">
           <input type="file" id="auditorInput" accept=".xlsx, .xls">
         </div>
         <button id="downloadAuditorTemplateBtn" style="width:100%; margin-top:4px; padding:8px; font-size:11px; accent-color:var(--primary);' background:var(--bg); border:1px solid var(--border); border-radius:4px; cursor:pointer;">
-            📥 Download Auditor Template
+            📥 Download Catalogue Template
         </button>
         <div id="auditorFileStatus" style="font-size:11px; color:var(--success); margin-top:4px; font-weight:600;"></div>
     </div>
 
-    <div id="watchlistSection" style="display:none !important;">
+    <div id="catalogueSection" style="display:none !important;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div class="bulk-hint" style="margin:0;">Manage Your Watchlist</div>
-            <div id="watchlistLimitMsg" style="font-size:10px; color:var(--text-muted);">Limit: 10 (Free)</div>
+            <div class="bulk-hint" style="margin:0;">Manage Your Catalogue</div>
+            <div id="catalogueLimitMsg" style="font-size:10px; color:var(--text-muted);">Limit: 10 (Free)</div>
         </div>
 
         <div style="display:flex; gap:6px; margin-bottom:12px; align-items:center;">
-            <select id="watchlistSelect" style="flex:1;"></select>
-            <button id="newWatchlistBtn" title="Create New List" style="padding:6px; width:auto; flex:none;">➕</button>
-            <button id="renameWatchlistBtn" title="Rename List" style="padding:6px; width:auto; flex:none;">✏️</button>
-            <button id="deleteWatchlistBtn" title="Delete List" style="padding:6px; width:auto; flex:none; color:var(--danger);">🗑️</button>
+            <select id="catalogueSelect" style="flex:1;"></select>
+            <button id="newCatalogueBtn" title="Create New Catalogue" style="padding:6px; width:auto; flex:none;">➕</button>
+            <button id="renameCatalogueBtn" title="Rename Catalogue" style="padding:6px; width:auto; flex:none;">✏️</button>
+            <button id="deleteCatalogueBtn" title="Delete Catalogue" style="padding:6px; width:auto; flex:none; color:var(--danger);">🗑️</button>
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-             <span style="font-size:11px; font-weight:600;">Items in List</span>
-             <button id="clearWatchlistBtn" style="background:transparent; border:none; color:var(--danger); font-size:10px; text-decoration:underline; cursor:pointer; padding:0;">Clear Items</button>
+             <span style="font-size:11px; font-weight:600;">Items in Catalogue</span>
+             <button id="clearCatalogueBtn" style="background:transparent; border:none; color:var(--danger); font-size:10px; text-decoration:underline; cursor:pointer; padding:0;">Clear Items</button>
         </div>
         
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 10px; font-weight: 700; padding: 4px 8px; color: var(--text-muted); border-bottom: 1px solid var(--border);">
@@ -369,13 +380,13 @@
             <span style="text-align:right">STATUS</span>
         </div>
         
-        <div id="watchlistItems" style="max-height: 250px; overflow-y: auto;">
-            <div style="padding:10px; text-align:center; color:var(--text-muted); font-size:11px;">Watchlist is empty.</div>
+        <div id="catalogueItems" style="max-height: 250px; overflow-y: auto;">
+            <div style="padding:10px; text-align:center; color:var(--text-muted); font-size:11px;">Catalogue is empty.</div>
         </div>
         
-        <div id="watchlistCount" style="font-size:10px; color:var(--text-muted); text-align:right; margin: 8px 0;">0 Items</div>
-        <button id="auditWatchlistBtn" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 700; border-radius: 6px;">
-             🛡️ AUDIT WATCHLIST
+        <div id="catalogueCount" style="font-size:10px; color:var(--text-muted); text-align:right; margin: 8px 0;">0 Items</div>
+        <button id="auditCatalogueBtn" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 700; border-radius: 6px;">
+             🛡️ AUDIT CATALOGUE
         </button>
     </div>
 
@@ -580,14 +591,39 @@
 
   <dialog id="inputModal">
       <div class="modal-header">
-          <span id="inputModalTitle">Watchlist Name</span>
+          <span id="inputModalTitle">Catalogue Name</span>
           <button id="closeInputModalBtn" style="flex:none; width:auto; background:transparent; border:none; color:var(--text-muted); font-size:20px; cursor:pointer;">&times;</button>
       </div>
       <div class="modal-body" style="padding: 16px;">
-          <input type="text" id="watchlistNameInput" placeholder="Enter name..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+          <input type="text" id="catalogueNameInput" placeholder="Enter name..." style="width: 100%; padding: 8px; box-sizing: border-box;">
       </div>
       <div class="modal-footer">
           <button id="saveInputBtn" class="auth-btn" style="background:var(--primary); color:white; width:auto; display:inline-flex;">Save</button>
+      </div>
+  </dialog>
+
+  <dialog id="saveToCatalogueModal">
+      <div class="modal-header">
+          <span>Import to Catalogue</span>
+          <button id="closeSaveModalBtn" style="flex:none; width:auto; background:transparent; border:none; color:var(--text-muted); font-size:20px; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+          <p style="margin-top:0; font-size:12px; color:var(--text-muted);">Select where to save the imported items:</p>
+
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; cursor:pointer;">
+              <input type="radio" name="saveOption" value="new" checked>
+              <span style="font-weight:600;">Create New Catalogue</span>
+          </label>
+          <input type="text" id="newCatalogueNameInput" placeholder="Enter catalogue name..." style="width: 100%; padding: 8px; box-sizing: border-box; margin-bottom: 16px; margin-left: 24px; width: calc(100% - 24px);">
+
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; cursor:pointer;">
+              <input type="radio" name="saveOption" value="append">
+              <span style="font-weight:600;">Append to Existing</span>
+          </label>
+          <select id="appendCatalogueSelect" style="width: calc(100% - 24px); padding: 8px; margin-left: 24px;" disabled></select>
+      </div>
+      <div class="modal-footer">
+          <button id="confirmImportBtn" class="auth-btn" style="background:var(--success); color:white; width:auto; display:inline-flex;">Save & Load</button>
       </div>
   </dialog>
 

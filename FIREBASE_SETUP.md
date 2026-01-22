@@ -1,6 +1,6 @@
 # Linking Your Extension to Google Firebase
 
-This guide explains how to set up a Google Firebase project and link it to your Chrome Extension. This will enable advanced features like **Cloud Sync** (saving your Watchlist across devices) and **User Authentication**.
+This guide explains how to set up a Google Firebase project and link it to your Chrome Extension. This will enable advanced features like **Cloud Sync** (saving your Catalogue across devices) and **User Authentication**.
 
 ## Step 1: Create a Firebase Project
 
@@ -90,4 +90,4 @@ service cloud.firestore {
 }
 ```
 
-This ensures a user can only read/write their own watchlist data.
+This ensures a user can only read/write their own catalogue data.

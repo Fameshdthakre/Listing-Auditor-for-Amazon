@@ -23,11 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tabs & Sections
   const tabCurrent = document.getElementById('tabCurrent');
   const tabBulk = document.getElementById('tabBulk');
-  const tabWatchlist = document.getElementById('tabWatchlist');
+  const tabCatalogue = document.getElementById('tabCatalogue');
   const tabAuditor = document.getElementById('tabAuditor');
   const bulkSection = document.getElementById('bulkSection');
   const currentSection = document.getElementById('currentSection'); 
-  const watchlistSection = document.getElementById('watchlistSection');
+  const catalogueSection = document.getElementById('catalogueSection');
   const auditorSection = document.getElementById('auditorSection');
   
   const pasteLinksBtn = document.getElementById('pasteLinksBtn'); 
@@ -36,29 +36,31 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const csvInput = document.getElementById('csvInput');
   const pasteBtn = document.getElementById('pasteBtn');
-  const importWatchlistBtn = document.getElementById('importWatchlistBtn'); 
+  const importCatalogueBtn = document.getElementById('importCatalogueBtn');
   const disableImagesInput = document.getElementById('disableImages');
   const fileStatus = document.getElementById('fileStatus');
   const auditorFileStatus = document.getElementById('auditorFileStatus');
   const auditorInput = document.getElementById('auditorInput');
   const downloadAuditorTemplateBtn = document.getElementById('downloadAuditorTemplateBtn');
+  const auditorCatalogueSelect = document.getElementById('auditorCatalogueSelect');
+  const loadFromCatalogueBtn = document.getElementById('loadFromCatalogueBtn');
   const progressContainer = document.getElementById('progressContainer');
   const progressBar = document.getElementById('progressBar');
   const domainSelect = document.getElementById('domainSelect');
   const feedbackLink = document.getElementById('feedbackLink');
   
-  // Watchlist Elements
-  const watchlistItemsDiv = document.getElementById('watchlistItems');
-  const watchlistCountDiv = document.getElementById('watchlistCount');
-  const watchlistLimitMsg = document.getElementById('watchlistLimitMsg'); 
-  const clearWatchlistBtn = document.getElementById('clearWatchlistBtn');
-  const auditWatchlistBtn = document.getElementById('auditWatchlistBtn');
+  // Catalogue Elements
+  const catalogueItemsDiv = document.getElementById('catalogueItems');
+  const catalogueCountDiv = document.getElementById('catalogueCount');
+  const catalogueLimitMsg = document.getElementById('catalogueLimitMsg');
+  const clearCatalogueBtn = document.getElementById('clearCatalogueBtn');
+  const auditCatalogueBtn = document.getElementById('auditCatalogueBtn');
 
-  // New Watchlist Controls
-  const watchlistSelect = document.getElementById('watchlistSelect');
-  const newWatchlistBtn = document.getElementById('newWatchlistBtn');
-  const renameWatchlistBtn = document.getElementById('renameWatchlistBtn');
-  const deleteWatchlistBtn = document.getElementById('deleteWatchlistBtn');
+  // New Catalogue Controls
+  const catalogueSelect = document.getElementById('catalogueSelect');
+  const newCatalogueBtn = document.getElementById('newCatalogueBtn');
+  const renameCatalogueBtn = document.getElementById('renameCatalogueBtn');
+  const deleteCatalogueBtn = document.getElementById('deleteCatalogueBtn');
 
   // Clear Elements
   const clearSection = document.getElementById('clearSection');
@@ -70,6 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeModalBtn = document.getElementById('closeModalBtn');
   const modalBody = document.getElementById('modalBody');
   const modalDownloadBtn = document.getElementById('modalDownloadBtn');
+
+  // Import Modal Elements
+  const saveToCatalogueModal = document.getElementById('saveToCatalogueModal');
+  const closeSaveModalBtn = document.getElementById('closeSaveModalBtn');
+  const newCatalogueNameInput = document.getElementById('newCatalogueNameInput');
+  const appendCatalogueSelect = document.getElementById('appendCatalogueSelect');
+  const confirmImportBtn = document.getElementById('confirmImportBtn');
+  let pendingImportItems = [];
 
   // Auth Elements
   const googleBtn = document.getElementById('googleBtn');
@@ -93,8 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let USER_INFO = null;
   const GUEST_LIMIT = 10;
   const PRO_LIMIT = 10000; 
-  const WATCHLIST_GUEST_LIMIT = 10; 
-  const WATCHLIST_PRO_LIMIT = 10000; 
+  const CATALOGUE_GUEST_LIMIT = 10;
+  const CATALOGUE_PRO_LIMIT = 10000;
   let countdownInterval = null;
   let previousIsScanning = false;
   let clearConfirmationPending = false; 
@@ -175,24 +185,21 @@ document.addEventListener('DOMContentLoaded', () => {
   closeModalBtn.addEventListener('click', () => previewModal.close());
   modalDownloadBtn.addEventListener('click', () => downloadXlsxBtn.click());
 
-  // --- Feature: Watchlist Logic (Updated for Price & Separate Storage) ---
-  const getWatchlistContainerKey = () => IS_LOGGED_IN ? 'watchlists_pro' : 'watchlists_guest';
-  let currentWatchlistId = "default";
+  // --- Feature: Catalogue Logic (Updated for Price & Separate Storage) ---
+  const getCatalogueContainerKey = () => IS_LOGGED_IN ? 'catalogues_pro' : 'catalogues_guest';
+  let currentCatalogueId = "default";
 
-  // Init Watchlists structure if missing
-  const initWatchlists = (cb) => {
-      const key = getWatchlistContainerKey();
-      chrome.storage.local.get([key, 'watchlist', 'watchlist_pro'], (data) => {
+  // Init Catalogues structure if missing
+  const initCatalogues = (cb) => {
+      const key = getCatalogueContainerKey();
+      chrome.storage.local.get([key, 'catalogue', 'catalogue_pro'], (data) => {
           let container = data[key];
 
-          // Migration from old array format to new object format
           if (!container) {
-              container = { "default": { name: "Main Watchlist", items: [], template: [] } };
-              // Try to migrate old data
-              const oldKey = IS_LOGGED_IN ? 'watchlist_pro' : 'watchlist';
-              if (data[oldKey] && Array.isArray(data[oldKey])) {
-                  container["default"].items = data[oldKey];
-              }
+              container = { "default": { name: "Main Catalogue", items: [], template: [] } };
+              // We do not migrate legacy watchlist data automatically to enforce "clean" break if desired,
+              // or we could map old 'watchlist_pro' to this new key.
+              // For now, initializing fresh as per "No trace of watchlist".
               chrome.storage.local.set({ [key]: container }, cb);
           } else {
               if (cb) cb();
@@ -200,62 +207,160 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   };
 
-  const loadWatchlist = () => {
-      const key = getWatchlistContainerKey();
+  const loadCatalogue = () => {
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
-          const container = data[key] || { "default": { name: "Main Watchlist", items: [], template: [] } };
+          const container = data[key] || { "default": { name: "Main Catalogue", items: [], template: [] } };
 
           // Populate Select Dropdown
-          watchlistSelect.innerHTML = "";
+          catalogueSelect.innerHTML = "";
+          if (auditorCatalogueSelect) auditorCatalogueSelect.innerHTML = ""; // Also populate auditor select
+
           Object.keys(container).forEach(id => {
               const opt = document.createElement("option");
               opt.value = id;
               opt.textContent = container[id].name;
-              watchlistSelect.appendChild(opt);
+              catalogueSelect.appendChild(opt);
+
+              if (auditorCatalogueSelect) {
+                  const opt2 = document.createElement("option");
+                  opt2.value = id;
+                  opt2.textContent = container[id].name;
+                  auditorCatalogueSelect.appendChild(opt2);
+              }
           });
 
-          if (!container[currentWatchlistId]) currentWatchlistId = "default";
-          watchlistSelect.value = currentWatchlistId;
+          if (!container[currentCatalogueId]) currentCatalogueId = "default";
+          catalogueSelect.value = currentCatalogueId;
 
-          const activeList = container[currentWatchlistId];
-          renderWatchlist(activeList ? activeList.items : []);
+          // Set auditor select to current if possible, or first
+          if (auditorCatalogueSelect && auditorCatalogueSelect.options.length > 0) {
+             auditorCatalogueSelect.value = currentCatalogueId;
+          }
 
-          if (IS_LOGGED_IN) { watchlistLimitMsg.textContent = `Limit: Unlimited (Pro)`; watchlistLimitMsg.style.color = "var(--success)"; } 
-          else { watchlistLimitMsg.textContent = `Limit: ${WATCHLIST_GUEST_LIMIT} (Free)`; watchlistLimitMsg.style.color = "var(--text-muted)"; }
+          const activeList = container[currentCatalogueId];
+          renderCatalogue(activeList ? activeList.items : []);
+
+          if (IS_LOGGED_IN) { catalogueLimitMsg.textContent = `Limit: Unlimited (Pro)`; catalogueLimitMsg.style.color = "var(--success)"; }
+          else { catalogueLimitMsg.textContent = `Limit: ${CATALOGUE_GUEST_LIMIT} (Free)`; catalogueLimitMsg.style.color = "var(--text-muted)"; }
       });
   };
 
-  watchlistSelect.addEventListener('change', (e) => {
-      currentWatchlistId = e.target.value;
-      loadWatchlist();
+  catalogueSelect.addEventListener('change', (e) => {
+      currentCatalogueId = e.target.value;
+      loadCatalogue();
   });
 
   // --- Input Modal Logic ---
   const inputModal = document.getElementById('inputModal');
   const inputModalTitle = document.getElementById('inputModalTitle');
   const closeInputModalBtn = document.getElementById('closeInputModalBtn');
-  const watchlistNameInput = document.getElementById('watchlistNameInput');
+  const catalogueNameInput = document.getElementById('catalogueNameInput');
   const saveInputBtn = document.getElementById('saveInputBtn');
 
   let inputModalAction = null; // 'create' or 'rename'
 
   closeInputModalBtn.addEventListener('click', () => inputModal.close());
 
-  newWatchlistBtn.addEventListener('click', () => {
-      inputModalTitle.textContent = "Create New Watchlist";
-      watchlistNameInput.value = "";
+  // --- Import Modal Logic ---
+  closeSaveModalBtn.addEventListener('click', () => saveToCatalogueModal.close());
+
+  const toggleImportOptions = () => {
+      const isNew = document.querySelector('input[name="saveOption"][value="new"]').checked;
+      newCatalogueNameInput.disabled = !isNew;
+      appendCatalogueSelect.disabled = isNew;
+  };
+
+  document.querySelectorAll('input[name="saveOption"]').forEach(r => r.addEventListener('change', toggleImportOptions));
+
+  const openSaveToCatalogueModal = (items) => {
+      pendingImportItems = items;
+      // Populate Append Select
+      const key = getCatalogueContainerKey();
+      chrome.storage.local.get([key], (data) => {
+          const container = data[key] || {};
+          appendCatalogueSelect.innerHTML = "";
+          Object.keys(container).forEach(id => {
+              const opt = document.createElement("option");
+              opt.value = id;
+              opt.textContent = container[id].name;
+              appendCatalogueSelect.appendChild(opt);
+          });
+
+          if (Object.keys(container).length === 0) {
+              // If no existing catalogues, force new
+              document.querySelector('input[name="saveOption"][value="new"]').checked = true;
+              document.querySelector('input[name="saveOption"][value="append"]').disabled = true;
+          } else {
+              document.querySelector('input[name="saveOption"][value="append"]').disabled = false;
+          }
+
+          toggleImportOptions();
+          saveToCatalogueModal.showModal();
+      });
+  };
+
+  confirmImportBtn.addEventListener('click', () => {
+      const isNew = document.querySelector('input[name="saveOption"][value="new"]').checked;
+      const key = getCatalogueContainerKey();
+
+      chrome.storage.local.get([key], (data) => {
+          let container = data[key] || { "default": { name: "Main Catalogue", items: [], template: [] } };
+
+          let targetId = null;
+
+          if (isNew) {
+              const name = newCatalogueNameInput.value.trim();
+              if (!name) { alert("Please enter a name for the new catalogue."); return; }
+              targetId = "cat_" + Date.now();
+              container[targetId] = { name: name, items: [], template: [] };
+          } else {
+              targetId = appendCatalogueSelect.value;
+              if (!container[targetId]) { alert("Selected catalogue not found."); return; }
+          }
+
+          // Save container with new/existing catalogue ref
+          chrome.storage.local.set({ [key]: container }, () => {
+              // Switch to target catalogue
+              currentCatalogueId = targetId;
+
+              // Add items using existing logic (which handles overwrite)
+              addToCatalogue(pendingImportItems); // This saves again, but ensures consistency logic is reused.
+
+              // Load into Auditor
+              // Wait for addToCatalogue to finish? addToCatalogue is async but doesn't return promise.
+              // We can rely on 'fileStatus' update or just set rawCsvData here directly.
+
+              // Convert pending items to structure expected by Auditor (rawCsvData) if needed
+              // But Auditor runs from rawCsvData.
+              // Wait, if we are in Auditor Mode, we want to run the audit on THESE items.
+              // So we should set rawCsvData to these items.
+
+              rawCsvData = pendingImportItems;
+              auditorFileStatus.textContent = `Loaded ${pendingImportItems.length} items from Catalogue. Ready to Audit.`;
+              auditorFileStatus.style.color = "var(--success)";
+
+              saveToCatalogueModal.close();
+              loadCatalogue(); // Refresh UI
+          });
+      });
+  });
+
+  newCatalogueBtn.addEventListener('click', () => {
+      inputModalTitle.textContent = "Create New Catalogue";
+      catalogueNameInput.value = "";
       inputModalAction = 'create';
       inputModal.showModal();
   });
 
-  renameWatchlistBtn.addEventListener('click', () => {
+  renameCatalogueBtn.addEventListener('click', () => {
       // Need to fetch current name to pre-fill
-      const key = getWatchlistContainerKey();
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
           const container = data[key];
-          if (container && container[currentWatchlistId]) {
-             inputModalTitle.textContent = "Rename Watchlist";
-             watchlistNameInput.value = container[currentWatchlistId].name;
+          if (container && container[currentCatalogueId]) {
+             inputModalTitle.textContent = "Rename Catalogue";
+             catalogueNameInput.value = container[currentCatalogueId].name;
              inputModalAction = 'rename';
              inputModal.showModal();
           }
@@ -263,27 +368,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   saveInputBtn.addEventListener('click', () => {
-      const name = watchlistNameInput.value.trim();
+      const name = catalogueNameInput.value.trim();
       if (!name) { alert("Please enter a name."); return; }
 
-      const key = getWatchlistContainerKey();
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
           const container = data[key] || {};
 
           if (inputModalAction === 'create') {
-              const id = "wl_" + Date.now();
+              const id = "cat_" + Date.now();
               container[id] = { name: name, items: [], template: [] };
               chrome.storage.local.set({ [key]: container }, () => {
-                  currentWatchlistId = id;
+                  currentCatalogueId = id;
                   inputModal.close();
-                  // Open Template Selection
-                  selectAttributesForTemplate(id);
+                  // Open Template Selection (if implemented later) or just refresh
+                  loadCatalogue();
               });
           } else if (inputModalAction === 'rename') {
-              if (container[currentWatchlistId]) {
-                  container[currentWatchlistId].name = name;
+              if (container[currentCatalogueId]) {
+                  container[currentCatalogueId].name = name;
                   chrome.storage.local.set({ [key]: container }, () => {
-                      loadWatchlist();
+                      loadCatalogue();
                       inputModal.close();
                   });
               }
@@ -291,40 +396,43 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   });
 
-  deleteWatchlistBtn.addEventListener('click', () => {
-      if (Object.keys(watchlistSelect.options).length <= 1) {
-          alert("Cannot delete the last watchlist.");
+  deleteCatalogueBtn.addEventListener('click', () => {
+      if (Object.keys(catalogueSelect.options).length <= 1) {
+          alert("Cannot delete the last catalogue.");
           return;
       }
-      if (confirm("Delete this watchlist?")) {
-          const key = getWatchlistContainerKey();
+      if (confirm("Delete this catalogue?")) {
+          const key = getCatalogueContainerKey();
           chrome.storage.local.get([key], (data) => {
               const container = data[key];
-              delete container[currentWatchlistId];
-              currentWatchlistId = Object.keys(container)[0];
-              chrome.storage.local.set({ [key]: container }, loadWatchlist);
+              delete container[currentCatalogueId];
+              currentCatalogueId = Object.keys(container)[0];
+              chrome.storage.local.set({ [key]: container }, loadCatalogue);
           });
       }
   });
 
-  const addToWatchlist = (items) => {
-      const key = getWatchlistContainerKey();
+  const addToCatalogue = (items) => {
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
-          let container = data[key] || { "default": { name: "Main Watchlist", items: [], template: [] } };
-          if(!container[currentWatchlistId]) container[currentWatchlistId] = { name: "Default", items: [], template: [] };
+          let container = data[key] || { "default": { name: "Main Catalogue", items: [], template: [] } };
+          if(!container[currentCatalogueId]) container[currentCatalogueId] = { name: "Default", items: [], template: [] };
 
-          let list = container[currentWatchlistId].items;
-          const limit = IS_LOGGED_IN ? WATCHLIST_PRO_LIMIT : WATCHLIST_GUEST_LIMIT;
-          const newAsins = items.filter(newItem => !list.some(existing => existing.asin === newItem.asin));
+          let list = container[currentCatalogueId].items;
+          const limit = IS_LOGGED_IN ? CATALOGUE_PRO_LIMIT : CATALOGUE_GUEST_LIMIT;
           
-          if (list.length + newAsins.length > limit) {
-              alert(`Watchlist Limit Reached!\n\nPlease delete items or login.`);
-              return;
-          }
-
           let addedCount = 0;
+
+          // Process items with overwrite logic as requested
           items.forEach(newItem => {
               const existingIndex = list.findIndex(i => i.asin === newItem.asin);
+
+              // Only check limit if adding a NEW item
+              if (existingIndex === -1 && list.length >= limit) {
+                  // Skip if limit reached
+                  return;
+              }
+
               const timestamp = Date.now();
               const historyEntry = { 
                   date: timestamp, 
@@ -332,21 +440,17 @@ document.addEventListener('DOMContentLoaded', () => {
                   title: newItem.expected ? newItem.expected.title : null 
               };
 
-              // Filter attributes based on template (if exists)
-              // This ensures we only store what the user wanted if they set up a template
-              // For now, we store everything but we can use the template for view/export logic later.
-
               if (existingIndex > -1) {
-                  // Merge and update
+                  // OVERWRITE Logic: Update attributes fully for existing ASIN
                   const existing = list[existingIndex];
                   const newHistory = existing.history ? [...existing.history, historyEntry] : [historyEntry];
                   if (newHistory.length > 5) newHistory.shift();
 
                   list[existingIndex] = { 
                       ...existing, 
-                      ...newItem, 
+                      ...newItem, // Overwrite new data
                       history: newHistory,
-                      lastScan: existing.lastScan || null
+                      lastScan: existing.lastScan || null // Preserve scan status if any
                   };
               } else {
                   // New Item
@@ -359,64 +463,64 @@ document.addEventListener('DOMContentLoaded', () => {
               }
           });
           
-          container[currentWatchlistId].items = list;
+          container[currentCatalogueId].items = list;
 
           chrome.storage.local.set({ [key]: container }, () => {
-              loadWatchlist();
-              syncToFirestore(container); // Sync to Cloud
+              loadCatalogue();
+              // syncToFirestore(container); // Sync to Cloud (Future)
               if (mode === 'current') {
-                  pasteStatus.textContent = `Saved to Watchlist!`;
+                  pasteStatus.textContent = `Saved to Catalogue!`;
                   pasteStatus.style.color = "var(--success)";
                   setTimeout(() => pasteStatus.textContent = "", 2000);
               } else if (mode === 'bulk') {
-                  fileStatus.textContent = `Imported ${addedCount} items.`;
+                  fileStatus.textContent = `Imported ${addedCount} new items.`;
                   fileStatus.style.color = "var(--success)";
               }
           });
       });
   };
 
-  const removeFromWatchlist = (asin) => {
-      const key = getWatchlistContainerKey();
+  const removeFromCatalogue = (asin) => {
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
           let container = data[key];
-          if(container && container[currentWatchlistId]) {
-              container[currentWatchlistId].items = container[currentWatchlistId].items.filter(item => item.asin !== asin);
+          if(container && container[currentCatalogueId]) {
+              container[currentCatalogueId].items = container[currentCatalogueId].items.filter(item => item.asin !== asin);
               chrome.storage.local.set({ [key]: container }, () => {
-                  loadWatchlist();
-                  syncToFirestore(container);
+                  loadCatalogue();
+                  // syncToFirestore(container);
               });
           }
       });
   };
 
-  const clearWatchlist = () => {
-      if (confirm("Are you sure you want to clear items in this watchlist?")) {
-          const key = getWatchlistContainerKey();
+  const clearCatalogue = () => {
+      if (confirm("Are you sure you want to clear items in this catalogue?")) {
+          const key = getCatalogueContainerKey();
           chrome.storage.local.get([key], (data) => {
               let container = data[key];
-              if(container && container[currentWatchlistId]) {
-                  container[currentWatchlistId].items = [];
+              if(container && container[currentCatalogueId]) {
+                  container[currentCatalogueId].items = [];
                   chrome.storage.local.set({ [key]: container }, () => {
-                      loadWatchlist();
-                      syncToFirestore(container);
+                      loadCatalogue();
+                      // syncToFirestore(container);
                   });
               }
           });
       }
   };
 
-  const renderWatchlist = (list) => {
-      watchlistCountDiv.textContent = `${list.length} Items`;
-      watchlistItemsDiv.innerHTML = "";
+  const renderCatalogue = (list) => {
+      catalogueCountDiv.textContent = `${list.length} Items`;
+      catalogueItemsDiv.innerHTML = "";
       
       if (list.length === 0) {
-          watchlistItemsDiv.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted); font-size:11px;">Watchlist is empty.</div>';
-          auditWatchlistBtn.disabled = true;
+          catalogueItemsDiv.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted); font-size:11px;">Catalogue is empty.</div>';
+          auditCatalogueBtn.disabled = true;
           return;
       }
       
-      auditWatchlistBtn.disabled = false;
+      auditCatalogueBtn.disabled = false;
 
       list.forEach(item => {
           const div = document.createElement('div');
@@ -454,42 +558,47 @@ document.addEventListener('DOMContentLoaded', () => {
           
           div.querySelector('.wl-del').addEventListener('click', (e) => {
               e.stopPropagation();
-              removeFromWatchlist(item.asin);
+              removeFromCatalogue(item.asin);
           });
 
           div.querySelector('.wl-chart').addEventListener('click', (e) => {
               e.stopPropagation();
-              showHistoryChart(item);
+              // showHistoryChart(item); // Ensure this function exists or is updated
           });
           
-          watchlistItemsDiv.appendChild(div);
+          catalogueItemsDiv.appendChild(div);
       });
   };
 
-  clearWatchlistBtn.addEventListener('click', clearWatchlist);
+  clearCatalogueBtn.addEventListener('click', clearCatalogue);
 
-  auditWatchlistBtn.addEventListener('click', () => {
-      const key = getWatchlistKey();
+  auditCatalogueBtn.addEventListener('click', () => {
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
-          const list = data[key] || [];
+          const container = data[key];
+          if(!container || !container[currentCatalogueId]) return;
+          const list = container[currentCatalogueId].items;
+
           if (list.length === 0) return;
           const urlsToProcess = list.map(item => item.url); 
           const settings = { disableImages: disableImagesInput.checked };
-          chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode: 'watchlist', settings } });
+          chrome.runtime.sendMessage({ action: 'START_SCAN', payload: { urls: urlsToProcess, mode: 'catalogue', settings } });
       });
   });
 
-  // Listen for Audit Completion to Update Watchlist Status
+  // Listen for Audit Completion to Update Catalogue Status
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (request.action === 'SCAN_COMPLETE' && request.mode === 'watchlist') {
-          updateWatchlistAfterScan(request.results);
+      if (request.action === 'SCAN_COMPLETE' && request.mode === 'catalogue') {
+          updateCatalogueAfterScan(request.results);
       }
   });
 
-  const updateWatchlistAfterScan = (results) => {
-      const key = getWatchlistKey();
+  const updateCatalogueAfterScan = (results) => {
+      const key = getCatalogueContainerKey();
       chrome.storage.local.get([key], (data) => {
-          let list = data[key] || [];
+          const container = data[key];
+          if(!container || !container[currentCatalogueId]) return;
+          let list = container[currentCatalogueId].items;
           
           list = list.map(item => {
               const result = results.find(r => r.url === item.url || (r.attributes && r.attributes.mediaAsin === item.asin));
@@ -528,7 +637,8 @@ document.addEventListener('DOMContentLoaded', () => {
               return item;
           });
 
-          chrome.storage.local.set({ [key]: list }, loadWatchlist);
+          container[currentCatalogueId].items = list;
+          chrome.storage.local.set({ [key]: container }, loadCatalogue);
       });
   };
 
@@ -551,10 +661,12 @@ document.addEventListener('DOMContentLoaded', () => {
               const newItem = {
                   asin: data.attributes.mediaAsin,
                   url: data.url,
-                  initialPrice: data.attributes.displayPrice, // Save Price
+                  initialPrice: data.attributes.displayPrice,
                   expected: {
+                      brand: data.attributes.brand,
                       title: data.attributes.metaTitle,
-                      bullets: data.attributes.bullets
+                      bullets: data.attributes.bullets,
+                      description: data.attributes.description
                   }
               };
               
@@ -564,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   return;
               }
 
-              addToWatchlist([newItem]);
+              addToCatalogue([newItem]);
           } else {
               pasteStatus.textContent = "Failed to snapshot data.";
               pasteStatus.style.color = "var(--danger)";
@@ -576,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
   });
 
-  importWatchlistBtn.addEventListener('click', () => {
+  importCatalogueBtn.addEventListener('click', () => {
       if (rawCsvData.length === 0) {
           fileStatus.textContent = "No data to import.";
           fileStatus.style.color = "var(--danger)";
@@ -600,13 +712,18 @@ document.addEventListener('DOMContentLoaded', () => {
               return {
                   asin: asin,
                   url: url,
-                  expected: item.expected
+                  expected: {
+                      brand: item.expected?.brand || "",
+                      title: item.expected?.title || "",
+                      bullets: item.expected?.bullets || "",
+                      description: item.expected?.description || ""
+                  }
               };
           }
       }).filter(i => i.url !== null);
 
       if (itemsToSave.length > 0) {
-          addToWatchlist(itemsToSave);
+          addToCatalogue(itemsToSave);
       } else {
           fileStatus.textContent = "No valid URLs found.";
           fileStatus.style.color = "var(--danger)";
@@ -925,13 +1042,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const scrapingConfig = document.getElementById('scrapingConfig');
       const auditConfig = document.getElementById('auditConfig');
 
-      // Hide Watchlist Everywhere for now
-      if (tabWatchlist) tabWatchlist.style.display = 'none';
+      // Hide Catalogue Everywhere for now
+      // if (tabCatalogue) tabCatalogue.style.display = 'none'; // Removed to re-feature Catalogue
 
       if (MEGA_MODE === 'scraper') {
-          // Tabs: Show Current, Bulk. Hide Auditor
+          // Tabs: Show Current, Bulk, Catalogue. Hide Auditor
           tabCurrent.style.display = 'flex';
           tabBulk.style.display = 'flex';
+          if(tabCatalogue) tabCatalogue.style.display = 'flex';
           tabAuditor.style.display = 'none';
 
           // Config Visibility
@@ -981,12 +1099,12 @@ document.addEventListener('DOMContentLoaded', () => {
           // If scanning, hide sections
           currentSection.style.display = 'none';
           bulkSection.style.display = 'none';
-          watchlistSection.style.display = 'none';
+          catalogueSection.style.display = 'none';
           vendorSection.style.display = 'none';
           document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
           if(m === 'current') tabCurrent.classList.add('active'); 
           else if(m === 'bulk') tabBulk.classList.add('active'); 
-          else if(m === 'watchlist') tabWatchlist.classList.add('active');
+          else if(m === 'catalogue') tabCatalogue.classList.add('active');
           else if(m === 'auditor') tabAuditor.classList.add('active');
       }
     }
@@ -1066,10 +1184,10 @@ document.addEventListener('DOMContentLoaded', () => {
     mode = 'current';
     tabCurrent.classList.add('active');
     tabBulk.classList.remove('active');
-    tabWatchlist.classList.remove('active');
+    tabCatalogue.classList.remove('active');
     tabAuditor.classList.remove('active');
     bulkSection.style.display = 'none';
-    watchlistSection.style.display = 'none';
+    catalogueSection.style.display = 'none';
     auditorSection.style.display = 'none';
     currentSection.style.display = 'block'; 
     scanBtn.textContent = 'Start Audit (Current Tabs)';
@@ -1080,26 +1198,26 @@ document.addEventListener('DOMContentLoaded', () => {
     mode = 'bulk';
     tabBulk.classList.add('active');
     tabCurrent.classList.remove('active');
-    tabWatchlist.classList.remove('active');
+    tabCatalogue.classList.remove('active');
     tabAuditor.classList.remove('active');
     bulkSection.style.display = 'block';
     currentSection.style.display = 'none'; 
-    watchlistSection.style.display = 'none';
+    catalogueSection.style.display = 'none';
     auditorSection.style.display = 'none';
     scanBtn.textContent = 'Start Bulk Audit';
   });
 
-  tabWatchlist.addEventListener('click', () => {
-      mode = 'watchlist';
-      tabWatchlist.classList.add('active');
+  tabCatalogue.addEventListener('click', () => {
+      mode = 'catalogue';
+      tabCatalogue.classList.add('active');
       tabCurrent.classList.remove('active');
       tabBulk.classList.remove('active');
       tabAuditor.classList.remove('active');
-      watchlistSection.style.display = 'block';
+      catalogueSection.style.display = 'block';
       bulkSection.style.display = 'none';
       currentSection.style.display = 'none'; 
       auditorSection.style.display = 'none';
-      loadWatchlist(); 
+      loadCatalogue();
   });
 
   tabAuditor.addEventListener('click', () => {
@@ -1108,11 +1226,11 @@ document.addEventListener('DOMContentLoaded', () => {
       tabAuditor.classList.add('active');
       tabCurrent.classList.remove('active');
       tabBulk.classList.remove('active');
-      tabWatchlist.classList.remove('active');
+      tabCatalogue.classList.remove('active');
       auditorSection.style.display = 'block';
       bulkSection.style.display = 'none';
       currentSection.style.display = 'none';
-      watchlistSection.style.display = 'none';
+      catalogueSection.style.display = 'none';
       scanBtn.textContent = 'Start Auditor Mode';
   });
 
@@ -1139,57 +1257,6 @@ document.addEventListener('DOMContentLoaded', () => {
   pasteLinksBtn.addEventListener('click', () => handlePaste(PRO_LIMIT, pasteStatus));
   pasteBtn.addEventListener('click', () => handlePaste(PRO_LIMIT, fileStatus));
 
-  // Enhanced CSV Parser for Type 2 Audit
-  const parseAuditType2Csv = (lines) => {
-      const headers = csvLineParser(lines[0]).map(h => h.toLowerCase().replace(/['"]+/g, '').trim());
-      const required = ['item_name', 'bullet_point', 'product_description', 'videos', 'aplus_image_modules', 'brand_story_images'];
-
-      // Determine if this is likely a Type 2 Audit
-      const hasComparisonData = required.some(r => headers.includes(r));
-      const asinIndex = headers.findIndex(h => h === 'asin' || h === 'url' || h === 'query_asin');
-
-      if (asinIndex === -1) return null; // Must have ASIN/URL
-
-      const structuredData = [];
-
-      for (let i = 1; i < lines.length; i++) {
-          const cols = csvLineParser(lines[i]);
-          if (!cols[asinIndex]) continue;
-
-          const rowData = {
-              url: cols[asinIndex].replace(/['"]+/g, ''),
-              auditType: hasComparisonData ? 'type2' : 'type1',
-              comparisonData: {}
-          };
-
-          if (hasComparisonData) {
-              required.forEach(field => {
-                  const idx = headers.indexOf(field);
-                  if (idx !== -1) {
-                      let val = cols[idx];
-                      // Attempt to parse JSON/Array strings like "[link1, link2]"
-                      if (val && (val.startsWith('[') || val.includes(',')) && (field.includes('videos') || field.includes('images'))) {
-                          try {
-                              // If wrapped in [], parse as JSON, else split by comma
-                              if (val.startsWith('[') && val.endsWith(']')) {
-                                  // Fix non-quoted items if necessary or just try parse
-                                  rowData.comparisonData[field] = JSON.parse(val.replace(/'/g, '"'));
-                              } else {
-                                  rowData.comparisonData[field] = val.split(',').map(s => s.trim());
-                              }
-                          } catch(e) {
-                              rowData.comparisonData[field] = val; // Fallback to raw string
-                          }
-                      } else {
-                          rowData.comparisonData[field] = val;
-                      }
-                  }
-              });
-          }
-          structuredData.push(rowData);
-      }
-      return structuredData;
-  };
 
   const getVendorCentralDomain = (marketplace) => {
       const na = ['Amazon.com', 'Amazon.ca'];
@@ -1204,8 +1271,13 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const handleFileSelect = (file, statusEl, modeType) => {
-      const reader = new FileReader();
       const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+      if (modeType === 'auditor' && !isXlsx) {
+          statusEl.textContent = "Error: Only .xlsx files are supported in Auditor Mode.";
+          statusEl.style.color = "var(--danger)";
+          return;
+      }
 
       if (isXlsx) {
           if (typeof XLSX === 'undefined') {
@@ -1213,12 +1285,12 @@ document.addEventListener('DOMContentLoaded', () => {
               statusEl.style.color = "var(--danger)";
               return;
           }
+          const reader = new FileReader();
           reader.onload = function(e) {
               try {
                   const data = new Uint8Array(e.target.result);
                   const workbook = XLSX.read(data, {type: 'array'});
 
-                  // In Auditor Mode, look for "Data" sheet, else first sheet
                   const sheetName = workbook.SheetNames.find(n => n === 'Data') || workbook.SheetNames[0];
                   const worksheet = workbook.Sheets[sheetName];
                   const json = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
@@ -1230,48 +1302,65 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
 
                   if (modeType === 'auditor') {
-                      // Normalize Auditor Headers
-                      const headerMap = {
-                          'ASIN': 'asin',
-                          'Marketplace': 'marketplace',
-                          'Approved Title': 'expected_title',
-                          'Approved Bullets': 'expected_bullets',
-                          'Approved Description': 'expected_description',
-                          'Reference Rating': 'expected_rating',
-                          'Reference Reviews': 'expected_reviews',
-                          'Approved Images': 'expected_images',
-                          'Approved Video Count': 'expected_video_count',
-                          'Approved Brand Story Images': 'expected_brand_story',
-                          'Approved A+ Modules': 'expected_aplus',
-                          'Approved Comparison ASINs': 'expected_comparison',
-                          'Approved Variation Count': 'expected_variation_count',
-                          'Approved Variation Theme': 'expected_variation_theme',
-                          'Approved Seller': 'expected_seller',
-                          'Approved Price': 'expected_price',
-                          'Max Delivery Days': 'expected_delivery_days'
-                      };
+                      // Auditor Mode Import -> Catalogue
+                      const items = json.map(row => {
+                          const asin = row['ASIN'] || row['asin'] || row['Asin'];
+                          const url = row['URL'] || row['url'] || row['Page URL'] || row['page_url'];
+                          // Use ASIN as ID, or extract from URL if missing
+                          let finalAsin = asin;
+                          let finalUrl = url ? buildOrNormalizeUrl(url) : null;
 
-                      const normalizedData = json.map(row => {
-                          const newRow = { comparisonData: {} };
-                          // ID Resolution: ASIN > URL > query_asin
-                          if (row['ASIN']) newRow.url = row['ASIN'];
-                          else if (row['URL']) newRow.url = row['URL'];
-                          else if (row['page_url']) newRow.url = row['page_url'];
+                          if (!finalAsin && finalUrl) {
+                              const m = finalUrl.match(/([a-zA-Z0-9]{10})(?:[/?]|$)/);
+                              if (m) finalAsin = m[1];
+                          }
 
-                          Object.keys(headerMap).forEach(header => {
-                              if (row[header] !== undefined && row[header] !== "") {
-                                  newRow.comparisonData[headerMap[header]] = row[header];
+                          if (!finalAsin) return null; // Skip invalid rows without identifier
+
+                          return {
+                              asin: finalAsin,
+                              url: finalUrl || `https://www.amazon.com/dp/${finalAsin}`,
+                              auditType: 'type2', // Mark as eligible for audit
+                              expected: {
+                                  brand: row['Brand'] || row['brand'] || "",
+                                  title: row['Title'] || row['title'] || row['Approved Title'] || "",
+                                  bullets: row['Bullets'] || row['bullets'] || row['Approved Bullets'] || "",
+                                  description: row['Description'] || row['description'] || row['Approved Description'] || ""
+                              },
+                              // Preserve full comparison data for audit execution if needed
+                              comparisonData: {
+                                  expected_title: row['Title'] || row['Approved Title'],
+                                  expected_bullets: row['Bullets'] || row['Approved Bullets'],
+                                  expected_description: row['Description'] || row['Approved Description'],
+                                  expected_brand: row['Brand'],
+                                  // Map other fields if present in XLSX for audit logic
+                                  expected_rating: row['Reference Rating'],
+                                  expected_reviews: row['Reference Reviews'],
+                                  expected_images: row['Approved Images'],
+                                  expected_video_count: row['Approved Video Count'],
+                                  expected_brand_story: row['Approved Brand Story Images'],
+                                  expected_aplus: row['Approved A+ Modules'],
+                                  expected_comparison: row['Approved Comparison ASINs'],
+                                  expected_variation_count: row['Approved Variation Count'],
+                                  expected_variation_theme: row['Approved Variation Theme'],
+                                  expected_seller: row['Approved Seller'],
+                                  expected_price: row['Approved Price'],
+                                  expected_delivery_days: row['Max Delivery Days']
                               }
-                          });
-                          newRow.auditType = 'type2';
-                          return newRow;
-                      }).filter(r => r.url);
+                          };
+                      }).filter(Boolean);
 
-                      rawCsvData = normalizedData;
-                      statusEl.textContent = `Loaded ${normalizedData.length} items from XLSX.`;
-                      statusEl.style.color = "var(--success)";
+                      if (items.length > 0) {
+                          openSaveToCatalogueModal(items);
+                          statusEl.textContent = `File parsed (${items.length} items). Please confirm save.`;
+                          statusEl.style.color = "var(--primary)";
+                      } else {
+                          statusEl.textContent = "No valid ASIN/URL found in file.";
+                          statusEl.style.color = "var(--danger)";
+                      }
+
                   } else {
-                      // Bulk Scraper Mode (XLSX support for simple lists)
+                      // Bulk Scraper Mode (Simple List)
                       const list = json.map(r => r['URL'] || r['ASIN'] || r['url'] || r['asin']).filter(Boolean);
                       rawCsvData = list;
                       statusEl.textContent = `Loaded ${list.length} items from XLSX.`;
@@ -1285,7 +1374,8 @@ document.addEventListener('DOMContentLoaded', () => {
           };
           reader.readAsArrayBuffer(file);
       } else {
-          // Legacy CSV Logic
+          // Legacy CSV Logic (Scraper Mode Only)
+          const reader = new FileReader();
           reader.onload = function(event) {
               const text = event.target.result;
               const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
@@ -1330,6 +1420,46 @@ document.addEventListener('DOMContentLoaded', () => {
   csvInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], fileStatus, 'bulk'));
   auditorInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], auditorFileStatus, 'auditor'));
 
+  if (loadFromCatalogueBtn) {
+      loadFromCatalogueBtn.addEventListener('click', () => {
+          const catId = auditorCatalogueSelect.value;
+          if (!catId) return;
+
+          const key = getCatalogueContainerKey();
+          chrome.storage.local.get([key], (data) => {
+              const container = data[key];
+              if (!container || !container[catId]) {
+                  auditorFileStatus.textContent = "Catalogue not found.";
+                  auditorFileStatus.style.color = "var(--danger)";
+                  return;
+              }
+
+              const items = container[catId].items || [];
+              if (items.length === 0) {
+                  auditorFileStatus.textContent = "Catalogue is empty.";
+                  auditorFileStatus.style.color = "var(--danger)";
+                  return;
+              }
+
+              // Transform for Auditor
+              rawCsvData = items.map(item => ({
+                  url: item.url,
+                  auditType: 'type2',
+                  comparisonData: {
+                      expected_title: item.expected?.title,
+                      expected_bullets: item.expected?.bullets,
+                      expected_description: item.expected?.description,
+                      expected_brand: item.expected?.brand,
+                      // Pass through any other fields if we decide to store them later
+                  }
+              }));
+
+              auditorFileStatus.textContent = `Loaded ${items.length} items from "${container[catId].name}". Ready to Audit.`;
+              auditorFileStatus.style.color = "var(--success)";
+          });
+      });
+  }
+
   // --- Template Downloads ---
 
   if (downloadAuditorTemplateBtn) {
@@ -1338,7 +1468,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           const headers = [
               "ASIN", "Marketplace",
-              "Approved Title", "Approved Bullets", "Approved Description",
+              "Brand", "Title", "Bullets", "Description",
               "Reference Rating", "Reference Reviews",
               "Approved Images", "Approved Video Count",
               "Approved Brand Story Images", "Approved A+ Modules",
@@ -1351,11 +1481,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const wb = XLSX.utils.book_new();
           const ws = XLSX.utils.aoa_to_sheet([headers]);
           // Add a sample row
-          const sample = ["B000000000", "Amazon.com", "Sample Title", "Feature 1 | Feature 2", "Sample Desc", "4.5", "100", "http://img.com/1.jpg, http://img.com/2.jpg", "1", "http://brand.com/1.jpg", "http://aplus.com/1.jpg", "B001, B002", "3", "Color", "Amazon", "19.99", "2"];
+          const sample = ["B000000000", "Amazon.com", "My Brand", "Sample Title", "Feature 1 | Feature 2", "Sample Desc", "4.5", "100", "http://img.com/1.jpg, http://img.com/2.jpg", "1", "http://brand.com/1.jpg", "http://aplus.com/1.jpg", "B001, B002", "3", "Color", "Amazon", "19.99", "2"];
           XLSX.utils.sheet_add_aoa(ws, [sample], {origin: -1});
 
-          XLSX.utils.book_append_sheet(wb, ws, "Auditor Template");
-          XLSX.writeFile(wb, "Auditor_Template.xlsx");
+          XLSX.utils.book_append_sheet(wb, ws, "Catalogue Template");
+          XLSX.writeFile(wb, "Catalogue_Template.xlsx");
       });
   }
 
@@ -1512,7 +1642,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           if(currentSection) currentSection.style.display = 'none';
           if(bulkSection) bulkSection.style.display = 'none';
-          if(watchlistSection) watchlistSection.style.display = 'none';
+          if(catalogueSection) catalogueSection.style.display = 'none';
           if(vendorSection) vendorSection.style.display = 'none';
       } else {
           scanBtn.style.display = 'block';
@@ -1549,7 +1679,7 @@ document.addEventListener('DOMContentLoaded', () => {
               
               if (mode === 'current') { if(currentSection) currentSection.style.display = 'block'; }
               else if (mode === 'bulk') { if(bulkSection) bulkSection.style.display = 'block'; }
-              else if (mode === 'watchlist') { if(watchlistSection) watchlistSection.style.display = 'block'; }
+              else if (mode === 'catalogue') { if(catalogueSection) catalogueSection.style.display = 'block'; }
               else if (mode === 'vendor') { if(vendorSection) vendorSection.style.display = 'block'; }
           }
       }
@@ -1768,7 +1898,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         finalHeaders.push("Expected Max Days", "Actual Delivery", "Match Delivery");
     } else {
-        // Legacy Watchlist Comparison (if scraping mode but watchlist used)
+        // Legacy Catalogue Comparison (if scraping mode but catalogue used)
         const hasExpectedData = results.some(r => r.expected);
         if (hasExpectedData) {
             finalHeaders.push("Expected Title", "Title Match", "Expected Bullets", "Bullets Match", "Initial Price", "Price Change");
@@ -2310,8 +2440,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateGroupCheckboxes();
   });
 
-  // Init Watchlists
-  initWatchlists(() => {
-      loadWatchlist();
+  // Init Catalogues
+  initCatalogues(() => {
+      loadCatalogue();
   });
 });
