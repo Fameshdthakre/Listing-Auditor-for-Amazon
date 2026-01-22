@@ -315,6 +315,15 @@ async function finishScan(state) {
   state.nextActionTime = null;
   await chrome.storage.local.set({ auditState: state });
 
+  // Notify frontend to update Catalogue status if applicable
+  try {
+      chrome.runtime.sendMessage({
+          action: 'SCAN_COMPLETE',
+          mode: state.mode,
+          results: state.results
+      }).catch(() => {}); // Ignore if no listener (e.g. sidepanel closed)
+  } catch(e) {}
+
   if (state.settings.disableImages) {
     await chrome.declarativeNetRequest.updateEnabledRulesets({
         disableRulesetIds: ["ruleset_1"]

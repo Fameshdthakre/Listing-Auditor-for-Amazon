@@ -278,29 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Populate Select Dropdown
           catalogueSelect.innerHTML = "";
-          if (auditorCatalogueSelect) auditorCatalogueSelect.innerHTML = ""; // Also populate auditor select
 
           Object.keys(container).forEach(id => {
               const opt = document.createElement("option");
               opt.value = id;
               opt.textContent = container[id].name;
               catalogueSelect.appendChild(opt);
-
-              if (auditorCatalogueSelect) {
-                  const opt2 = document.createElement("option");
-                  opt2.value = id;
-                  opt2.textContent = container[id].name;
-                  auditorCatalogueSelect.appendChild(opt2);
-              }
           });
 
           if (!container[currentCatalogueId]) currentCatalogueId = "default";
           catalogueSelect.value = currentCatalogueId;
-
-          // Set auditor select to current if possible, or first
-          if (auditorCatalogueSelect && auditorCatalogueSelect.options.length > 0) {
-             auditorCatalogueSelect.value = currentCatalogueId;
-          }
 
           const activeList = container[currentCatalogueId];
           renderCatalogue(activeList ? activeList.items : []);
@@ -406,8 +393,10 @@ document.addEventListener('DOMContentLoaded', () => {
               // So we should set rawCsvData to these items.
 
               rawCsvData = pendingImportItems;
-              auditorFileStatus.textContent = `Loaded ${pendingImportItems.length} items from Catalogue. Ready to Audit.`;
-              auditorFileStatus.style.color = "var(--success)";
+              if(catalogueImportStatus) {
+                  catalogueImportStatus.textContent = `Loaded ${pendingImportItems.length} items from Catalogue. Ready to Audit.`;
+                  catalogueImportStatus.style.color = "var(--success)";
+              }
 
               saveToCatalogueModal.close();
               loadCatalogue(); // Refresh UI
@@ -1490,45 +1479,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // auditorInput removed in favor of catalogueInput, removing listener to fix ReferenceError
   // if (auditorInput) auditorInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0], auditorFileStatus, 'auditor'));
 
-  if (loadFromCatalogueBtn) {
-      loadFromCatalogueBtn.addEventListener('click', () => {
-          const catId = auditorCatalogueSelect.value;
-          if (!catId) return;
-
-          const key = getCatalogueContainerKey();
-          chrome.storage.local.get([key], (data) => {
-              const container = data[key];
-              if (!container || !container[catId]) {
-                  auditorFileStatus.textContent = "Catalogue not found.";
-                  auditorFileStatus.style.color = "var(--danger)";
-                  return;
-              }
-
-              const items = container[catId].items || [];
-              if (items.length === 0) {
-                  auditorFileStatus.textContent = "Catalogue is empty.";
-                  auditorFileStatus.style.color = "var(--danger)";
-                  return;
-              }
-
-              // Transform for Auditor
-              rawCsvData = items.map(item => ({
-                  url: item.url,
-                  auditType: 'type2',
-                  comparisonData: {
-                      expected_title: item.expected?.title,
-                      expected_bullets: item.expected?.bullets,
-                      expected_description: item.expected?.description,
-                      expected_brand: item.expected?.brand,
-                      // Pass through any other fields if we decide to store them later
-                  }
-              }));
-
-              auditorFileStatus.textContent = `Loaded ${items.length} items from "${container[catId].name}". Ready to Audit.`;
-              auditorFileStatus.style.color = "var(--success)";
-          });
-      });
-  }
+  // loadFromCatalogueBtn logic is removed as it's no longer in the UI (integrated into main flow)
 
   // --- Template Downloads ---
 
