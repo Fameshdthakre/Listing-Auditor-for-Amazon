@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Elements
   const scanBtn = document.getElementById('scanBtn');
   const stopBtn = document.getElementById('stopBtn');
-  const copyBtn = document.getElementById('copyBtn');
+  // const copyBtn = document.getElementById('copyBtn'); // Removed from HTML
   const downloadBtn = document.getElementById('downloadBtn');
   const downloadXlsxBtn = document.getElementById('downloadXlsxBtn'); 
   const pushSheetBtn = document.getElementById('pushSheetBtn'); 
@@ -889,7 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
           downloadXlsxBtn.style.display = 'none'; 
           pushSheetBtn.style.display = 'none'; 
           pushExcelBtn.style.display = 'none'; 
-          copyBtn.style.display = 'none'; 
+          // if(copyBtn) copyBtn.style.display = 'none';
           clearSection.style.display = 'none'; 
       }
   });
@@ -1677,7 +1677,7 @@ document.addEventListener('DOMContentLoaded', () => {
           pushSheetBtn.style.display = 'none'; 
           pushExcelBtn.style.display = 'none'; 
           downloadErrorsBtn.style.display = 'none';
-          copyBtn.style.display = 'none';
+          // if(copyBtn) copyBtn.style.display = 'none';
           clearSection.style.display = 'none';
           dashboardView.style.display = 'none';
           resultsPlaceholder.style.display = 'block'; 
@@ -1695,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', () => {
               downloadXlsxBtn.style.display = 'block'; 
               pushSheetBtn.style.display = 'block'; 
               pushExcelBtn.style.display = 'block'; 
-              copyBtn.style.display = 'block';
+              // if(copyBtn) copyBtn.style.display = 'block';
               clearSection.style.display = 'block';
               resultsPlaceholder.style.display = 'none'; 
 
@@ -1714,7 +1714,7 @@ document.addEventListener('DOMContentLoaded', () => {
               pushSheetBtn.style.display = 'none';
               pushExcelBtn.style.display = 'none';
               downloadErrorsBtn.style.display = 'none';
-              copyBtn.style.display = 'none';
+              // if(copyBtn) copyBtn.style.display = 'none';
               clearSection.style.display = 'none';
               resultsPlaceholder.style.display = 'block'; 
               
