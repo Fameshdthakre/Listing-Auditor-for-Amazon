@@ -18,27 +18,46 @@
             if (url.includes("/imaging/manage")) {
                 result.type = "images";
                 result.images = [];
+                result.data = []; // For Auditor compatibility
 
-                // Selector: div[class*="imageGroup clearfix"]:eq(0) > div
-                // In JS: document.querySelectorAll('.imageGroup.clearfix')[0].querySelectorAll('div')
-
-                const group = document.querySelector('div[class*="imageGroup"]'); // first one
+                // Method A: Legacy Selector
+                const group = document.querySelector('div[class*="imageGroup"]');
                 if (group) {
-                    const containers = group.children; // direct divs
+                    const containers = group.children;
                     for (let div of containers) {
-                        // "div:eq(0) > img" -> div.querySelector('div > img') or just first img inside?
-                        // "div:eq(0)" usually means first child.
-                        // The structure is likely: Container > Wrapper > Img.
-                        // Let's look for the first IMG in this container.
                         const img = div.querySelector('img');
                         if (img) {
-                            result.images.push({
-                                variant: img.alt || "none", // Variant Name (Alt)
-                                src: img.src || "none"      // Image Link
-                            });
+                            const imgObj = {
+                                variant: img.alt || "none",
+                                src: img.src || "none",
+                                large: cleanImageUrl(img.src)
+                            };
+                            result.images.push(imgObj);
+                            result.data.push(imgObj);
                         }
                     }
                 }
+
+                // Method B: Modern Selector (from Auditor/Scraper)
+                if (result.data.length === 0) {
+                     const selector = 'div[data-testid*="image-wrapper"] > img[class*="variantImage"]';
+                     const images = document.querySelectorAll(selector);
+                     images.forEach(img => {
+                        const imgObj = {
+                            variant: img.alt || "none",
+                            src: img.src || "none",
+                            large: cleanImageUrl(img.src)
+                        };
+                        result.images.push(imgObj);
+                        result.data.push(imgObj);
+                     });
+                }
+
+                // Metadata
+                const h3TitleEl = document.querySelector('h3[id="title"]');
+                result.title = h3TitleEl ? h3TitleEl.innerText.trim() : document.title;
+                const urlParams = new URLSearchParams(window.location.search);
+                result.asin = urlParams.get('asins') || "none";
             }
 
             // 2. Catalog Edit Page
