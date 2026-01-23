@@ -2,6 +2,12 @@
 //   import { doc, setDoc, getDoc } from './firebase/firebase-firestore.js';
 //   import { GoogleAuthProvider, signInWithCredential } from './firebase/firebase-auth.js'; // Assuming auth is available
   import { MS_CLIENT_ID, MS_AUTH_URL, MS_SCOPES } from './config.js';
+  import {
+      marketplaceData, getVendorCentralDomain, buildOrNormalizeUrl,
+      csvLineParser, parseAuditType2Csv, cleanAmazonUrl, cleanField,
+      SCRAPING_COLUMNS, AUDIT_COLUMNS, MASTER_COLUMNS, forcedFields, fieldConfig
+  } from './scraperEngine.js';
+  import { runAuditComparison } from './auditorEngine.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
@@ -1183,26 +1189,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  const marketplaceData = {
-    'Amazon.com': { root: 'https://www.amazon.com/dp/', en: '?language=en_US', native: '?language=en_US' },
-    'Amazon.ca': { root: 'https://www.amazon.ca/dp/', en: '?language=en_CA', native: '?language=en_CA' },
-    'Amazon.co.uk': { root: 'https://www.amazon.co.uk/dp/', en: '?currency=USD', native: '?currency=GBP' },
-    'Amazon.de': { root: 'https://www.amazon.de/dp/', en: '?language=en_GB', native: '?language=de_DE' },
-    'Amazon.fr': { root: 'https://www.amazon.fr/dp/', en: '?language=en_GB', native: '?language=fr_FR' },
-    'Amazon.it': { root: 'https://www.amazon.it/dp/', en: '?language=en_GB', native: '?language=it_IT' },
-    'Amazon.es': { root: 'https://www.amazon.es/dp/', en: '?language=en_GB', native: '?language=es_ES' },
-    'Amazon.nl': { root: 'https://www.amazon.nl/dp/', en: '?language=en_GB', native: '?language=nl_NL' },
-    'Amazon.se': { root: 'https://www.amazon.se/dp/', en: '?language=en_GB', native: '?language=sv_SE' },
-    'Amazon.com.be': { root: 'https://www.amazon.com.be/dp/', en: '?language=en_GB', native: '?language=fr_BE' },
-    'Amazon.com.au': { root: 'https://www.amazon.com.au/dp/', en: '?currency=AUD', native: '?currency=AUD' },
-    'Amazon.sg': { root: 'https://www.amazon.sg/dp/', en: '?currency=SGD', native: '?currency=SGD' },
-    'Amazon.ae': { root: 'https://www.amazon.ae/dp/', en: '?language=en_AE', native: '?language=ar_AE' },
-    'Amazon.sa': { root: 'https://www.amazon.sa/dp/', en: '?language=en_AE', native: '?language=ar_AE' },
-    'Amazon.eg': { root: 'https://www.amazon.eg/dp/', en: '?language=en_AE', native: '?language=ar_AE' },
-    'Amazon.in': { root: 'https://www.amazon.in/dp/', en: '?language=en_IN', native: '?language=hi_IN' },
-    'Amazon.co.jp': { root: 'https://www.amazon.co.jp/dp/', en: '?language=en_US', native: '?language=ja_JP' }
-  };
-
   Object.keys(marketplaceData).forEach(domain => {
     const option = document.createElement('option');
     option.value = domain;
@@ -1211,39 +1197,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   if(marketplaceData['Amazon.com']) domainSelect.value = 'Amazon.com';
 
-  const buildOrNormalizeUrl = (input) => {
-    input = input.trim();
-    if(!input) return null;
-    const langPref = document.querySelector('input[name="langPref"]:checked').value;
-    const config = marketplaceData[domainSelect.value];
-    const langParam = (langPref === 'english') ? config.en : config.native;
-
-    if (input.startsWith('http')) {
-        if (!input.includes(langParam)) {
-            const separator = input.includes('?') ? '&' : '?';
-            const cleanParam = separator === '&' ? langParam.replace('?', '') : langParam;
-            return input + separator + cleanParam;
-        }
-        return input; 
-    } else if (/^[A-Z0-9]{10}$/.test(input)) {
-        let root = config.root;
-        if (!root.endsWith('/')) root += '/';
-        return root + input + langParam;
-    }
-    return null;
-  };
-
-  const csvLineParser = (str) => {
-      const arr = [];
-      let quote = false;
-      let col = '';
-      for (let c of str) {
-          if (c === '"') { quote = !quote; } 
-          else if (c === ',' && !quote) { arr.push(col.trim()); col = ''; } 
-          else { col += c; }
-      }
-      arr.push(col.trim());
-      return arr;
+  // Wrapper for imported buildOrNormalizeUrl to inject current UI state
+  const normalizeUrl = (input) => {
+      const langPref = document.querySelector('input[name="langPref"]:checked').value;
+      return buildOrNormalizeUrl(input, domainSelect.value, langPref);
   };
 
   tabCurrent.addEventListener('click', () => {
@@ -1361,18 +1318,17 @@ document.addEventListener('DOMContentLoaded', () => {
                   if (modeType === 'auditor') {
                       // Auditor Mode Import -> Catalogue
                       const items = json.map(row => {
-                          // Map new headers: QueryASIN, Brand, Source Title, etc.
                           const asin = row['QueryASIN'] || row['ASIN'] || row['asin'];
                           const url = row['URL'] || row['url'];
 
                           let finalAsin = asin;
-                          let finalUrl = url ? buildOrNormalizeUrl(url) : null;
+                          let finalUrl = url ? normalizeUrl(url) : null;
 
                           if (!finalAsin && finalUrl) {
                               const m = finalUrl.match(/([a-zA-Z0-9]{10})(?:[/?]|$)/);
                               if (m) finalAsin = m[1];
                           } else if (finalAsin && !finalUrl) {
-                              finalUrl = `https://www.amazon.com/dp/${finalAsin}`; // Default fallback
+                              finalUrl = `https://www.amazon.com/dp/${finalAsin}`;
                           }
 
                           if (!finalAsin) return null;
