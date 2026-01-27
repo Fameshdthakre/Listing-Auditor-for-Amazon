@@ -140,7 +140,14 @@ export const SCRAPING_COLUMNS = [
 ];
 
 // 2. Audit Mode Columns (Superset including booleans and counts)
-export const AUDIT_COLUMNS = [...SCRAPING_COLUMNS];
+export const AUDIT_COLUMNS = [
+    ...SCRAPING_COLUMNS,
+    // Add new Auditor fields
+    'Status', 'Audit Note',
+    'Matches on Amazon PDP', 'Missing on Amazon PDP', 'Extra on Amazon PDP',
+    'PDP Self-Duplicated', 'VC Self-Duplicated',
+    'VC Images Count', 'PDP Images Count', 'VC PageURL'
+];
 
 export const MASTER_COLUMNS = [
   { key: 'status', header: 'status' },
@@ -180,7 +187,18 @@ export const MASTER_COLUMNS = [
   { key: 'aPlusImgs', header: 'aplus_image_modules' },
   { key: 'hasVideo', header: 'has_video' },
   { key: 'videoCount', header: 'videos_count' },
-  { key: 'videos', header: 'videos' }
+  { key: 'videos', header: 'videos' },
+  // New Auditor Fields
+  { key: 'Status', header: 'audit_status' },
+  { key: 'Audit Note', header: 'audit_note' },
+  { key: 'Matches on Amazon PDP', header: 'matches_on_pdp' },
+  { key: 'Missing on Amazon PDP', header: 'missing_on_pdp' },
+  { key: 'Extra on Amazon PDP', header: 'extra_on_pdp' },
+  { key: 'PDP Self-Duplicated', header: 'pdp_duplicates' },
+  { key: 'VC Self-Duplicated', header: 'vc_duplicates' },
+  { key: 'VC Images Count', header: 'vc_image_count' },
+  { key: 'PDP Images Count', header: 'pdp_image_count' },
+  { key: 'VC PageURL', header: 'vc_url' }
 ];
 
 export const forcedFields = ['marketplace', 'deliveryLocation', 'mediaAsin', 'url', 'queryASIN'];
@@ -220,5 +238,15 @@ export const fieldConfig = {
   'videos': { type: 'attr' },
   'imgVariantCount': { type: 'calc' },
   'imgVariantDetails': { type: 'calc' },
-  'url': { type: 'root' }
+  'url': { type: 'root' },
+  'Status': { type: 'root' },
+  'Audit Note': { type: 'root' },
+  'Matches on Amazon PDP': { type: 'root' },
+  'Missing on Amazon PDP': { type: 'root' },
+  'Extra on Amazon PDP': { type: 'root' },
+  'PDP Self-Duplicated': { type: 'root' },
+  'VC Self-Duplicated': { type: 'root' },
+  'VC Images Count': { type: 'root' },
+  'PDP Images Count': { type: 'root' },
+  'VC PageURL': { type: 'root' }
 };

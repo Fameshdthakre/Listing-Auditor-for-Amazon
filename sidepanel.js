@@ -1,6 +1,3 @@
-// import { app, db } from './firebase/firebase-config.js';
-//   import { doc, setDoc, getDoc } from './firebase/firebase-firestore.js';
-//   import { GoogleAuthProvider, signInWithCredential } from './firebase/firebase-auth.js'; // Assuming auth is available
   import { MS_CLIENT_ID, MS_AUTH_URL, MS_SCOPES } from './config.js';
   import {
       marketplaceData, getVendorCentralDomain, buildOrNormalizeUrl,
@@ -179,9 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let previousIsScanning = false;
   let clearConfirmationPending = false; 
   let currentIsScanning = false;
-
-  // --- CONFIG: Firebase ---
-  // Firebase initialized in firebase/firebase-config.js and imported at the top of this file.
 
   // --- Feature: Theme Toggle ---
   function initTheme() {

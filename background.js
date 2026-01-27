@@ -1,4 +1,8 @@
+import { Auditor } from './src/Auditor.js';
+
 // background.js - Robust Batch Processing (Current Window)
+
+let currentAuditor = null;
 
 const INITIAL_STATE = {
   isScanning: false,
@@ -54,6 +58,78 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 async function startScan(payload) {
   const { urls, mode, settings, targetWindowId } = payload;
   
+  // --- AUDITOR MODE LOGIC ---
+  if (mode === 'catalogue') {
+      const asins = urls.map(u => {
+          if(typeof u === 'string') return getAsinFromUrl(u);
+          return u.id || getAsinFromUrl(u.url);
+      }).filter(a => a !== 'none');
+      const uniqueAsins = [...new Set(asins)];
+
+      const newState = {
+        ...INITIAL_STATE,
+        isScanning: true,
+        mode,
+        urlsToProcess: uniqueAsins,
+        settings,
+        processedCount: 0,
+        statusMessage: "Initializing Auditor...",
+        targetWindowId
+      };
+      await chrome.storage.local.set({ auditState: newState });
+
+      if (currentAuditor && currentAuditor.isJobRunning) await currentAuditor.stop();
+
+      currentAuditor = new Auditor({
+          scraperPath: 'content.js',
+          onProgress: async (current, total, logs, startTime, results) => {
+               const data = await chrome.storage.local.get('auditState');
+               if(data.auditState && data.auditState.isScanning) {
+                   data.auditState.processedCount = current;
+                   data.auditState.statusMessage = logs;
+                   if (results) data.auditState.results = results;
+                   await chrome.storage.local.set({ auditState: data.auditState });
+               }
+          },
+          onComplete: async (results, status, logs) => {
+               const data = await chrome.storage.local.get('auditState');
+               if(data.auditState) {
+                   data.auditState.isScanning = false;
+                   data.auditState.results = results;
+                   data.auditState.statusMessage = logs;
+                   await chrome.storage.local.set({ auditState: data.auditState });
+                   try {
+                       chrome.runtime.sendMessage({
+                          action: 'SCAN_COMPLETE',
+                          mode: mode,
+                          results: results
+                       }).catch(()=>{});
+                   } catch(e){}
+               }
+               currentAuditor = null;
+          },
+          onError: (err) => {
+              console.error("Auditor Error", err);
+          }
+      });
+
+      // Domain Heuristic
+      let domain = "com";
+      if (urls.length > 0) {
+          const sampleUrl = typeof urls[0] === 'string' ? urls[0] : urls[0].url;
+          if (sampleUrl) {
+              const match = sampleUrl.match(/amazon\.([a-z\.]+)\//);
+              if (match) domain = match[1];
+          }
+      }
+      const vcBaseUrl = `https://vendorcentral.amazon.${domain}/imaging/manage?asins=`;
+
+      currentAuditor.start(uniqueAsins, domain, vcBaseUrl, 5, targetWindowId);
+      return;
+  }
+
+  // --- STANDARD SCRAPER LOGIC ---
+
   const newState = {
     ...INITIAL_STATE,
     isScanning: true,
@@ -85,6 +161,11 @@ async function startScan(payload) {
 
 async function stopScan() {
   await chrome.alarms.clearAll();
+
+  if (currentAuditor) {
+      await currentAuditor.stop();
+      currentAuditor = null;
+  }
 
   const data = await chrome.storage.local.get('auditState');
   const state = data.auditState;

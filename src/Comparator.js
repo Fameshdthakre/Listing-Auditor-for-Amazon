@@ -13,6 +13,8 @@ export function processAudit(queryAsin, vcRes, pdpRes, vcUrl, pdpUrl) {
   const vcImages = (vcRes?.data || []).filter(filterSwch);
   const pdpImages = (pdpRes?.data || []).filter(filterSwch);
   const pageAsin = pdpRes?.mediaAsin || "none";
+  // Merge existing attributes if available
+  const attributes = pdpRes?.attributes || {};
 
   let status = "SUCCESS";
   if (!pdpRes || (pdpImages.length === 0 && !pdpRes.found)) {
@@ -88,7 +90,8 @@ export function processAudit(queryAsin, vcRes, pdpRes, vcUrl, pdpUrl) {
     "PDP PageURL": pdpUrl,
     "VC Images": JSON.stringify(vcImages),
     "VC Images Count": vcImages.length,
-    "VC PageURL": vcUrl
+    "VC PageURL": vcUrl,
+    "attributes": attributes
   };
 }
 
@@ -108,6 +111,7 @@ export function createErrorResult(queryAsin, type, vcUrl, pdpUrl, domain, rawMsg
       "PDP PageURL": pdpUrl,
       "VC Images": "[]",
       "VC Images Count": 0,
-      "VC PageURL": vcUrl
+      "VC PageURL": vcUrl,
+      "attributes": {}
     };
   }
